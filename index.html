@@ -1,0 +1,1451 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Classroom Seating Chart</title>
+  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.5.3/papaparse.min.js"></script>
+  <style>
+    /* ── Reset & base ────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: system-ui, -apple-system, sans-serif; font-size: 14px;
+           background: #f3f4f6; color: #111827; height: 100vh;
+           display: flex; flex-direction: column; overflow: hidden; }
+
+    /* ── CSS custom properties ───────────────────────────────── */
+    :root {
+      --seat-w: 90px;
+      --seat-h: 70px;
+      --seat-gap: 8px;
+      --aisle-gap: 14px;
+      --aisle-color: #3b82f6;
+      --disabled-bg: #d1d5db;
+      --toolbar-h: 48px;
+    }
+
+    /* ── Toolbar ─────────────────────────────────────────────── */
+    #toolbar {
+      height: var(--toolbar-h);
+      background: #1e293b;
+      color: #f8fafc;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 0 12px;
+      flex-shrink: 0;
+      flex-wrap: wrap;
+    }
+    #toolbar h1 { font-size: 15px; font-weight: 600; margin-right: 4px; white-space: nowrap; }
+    #toolbar select, #toolbar button {
+      height: 30px;
+      padding: 0 10px;
+      border-radius: 5px;
+      border: none;
+      cursor: pointer;
+      font-size: 13px;
+      white-space: nowrap;
+    }
+    #toolbar select { background: #334155; color: #f1f5f9; min-width: 110px; }
+    #toolbar button { background: #3b82f6; color: #fff; font-weight: 500; }
+    #toolbar button:hover { background: #2563eb; }
+    #btn-manage { background: #475569; }
+    #btn-manage:hover { background: #334155; }
+    #btn-export-json { background: #059669; }
+    #btn-export-json:hover { background: #047857; }
+    #btn-import-json { background: #7c3aed; }
+    #btn-import-json:hover { background: #6d28d9; }
+    #btn-export-pdf { background: #dc2626; }
+    #btn-export-pdf:hover { background: #b91c1c; }
+
+    /* ── Main area ───────────────────────────────────────────── */
+    #main {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+    }
+
+    /* ── Classroom area ──────────────────────────────────────── */
+    #classroom-area {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 16px;
+      overflow: auto;
+      min-width: 0;
+    }
+    .room-label {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      color: #6b7280;
+      padding: 4px 0;
+    }
+    #seat-grid-wrapper {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+      overflow: auto;
+    }
+    #seat-grid {
+      display: grid;
+      gap: var(--seat-gap);
+      position: relative;
+    }
+
+    /* ── Seats ───────────────────────────────────────────────── */
+    .seat {
+      width: var(--seat-w);
+      height: var(--seat-h);
+      background: #fff;
+      border: 2px solid #d1d5db;
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: grab;
+      text-align: center;
+      transition: border-color 0.15s, background 0.15s;
+      position: relative;
+      user-select: none;
+    }
+    .seat:hover { border-color: #93c5fd; }
+    .seat.occupied { background: #eff6ff; border-color: #3b82f6; }
+    .seat.occupied:hover { border-color: #1d4ed8; }
+    .seat.disabled {
+      background: var(--disabled-bg);
+      border-color: #9ca3af;
+      cursor: not-allowed;
+    }
+    .seat.drag-over { border-color: #f59e0b; background: #fef3c7; }
+    .seat-name {
+      font-size: var(--seat-name-size, 11px);
+      line-height: 1.3;
+      padding: 4px;
+      pointer-events: none; /* prevents dragleave flicker */
+      overflow: hidden;
+      word-break: break-word;
+      text-align: center;
+    }
+    .seat-first-name { font-weight: 700; }
+    .seat-last-name { font-weight: 400; color: #6b7280; }
+    .seat-empty-hint {
+      font-size: var(--seat-hint-size, 10px);
+      color: #d1d5db;
+      pointer-events: none;
+    }
+
+    /* ── Aisle separator ─────────────────────────────────────── */
+    .aisle-separator {
+      width: 3px;
+      background: var(--aisle-color);
+      border-radius: 2px;
+      opacity: 0.5;
+      pointer-events: none;
+      align-self: stretch;
+      justify-self: center;
+    }
+
+    /* ── Students panel ──────────────────────────────────────── */
+    #students-panel {
+      width: 210px;
+      flex-shrink: 0;
+      background: #fff;
+      border-left: 1px solid #e5e7eb;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    #students-panel-header {
+      padding: 12px;
+      border-bottom: 1px solid #e5e7eb;
+      background: #f9fafb;
+    }
+    #students-panel-header h2 { font-size: 13px; font-weight: 600; margin-bottom: 2px; }
+    #unseated-count { font-size: 12px; color: #6b7280; }
+    #students-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 8px;
+    }
+    .student-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 4px;
+      border-radius: 5px;
+      cursor: grab;
+      border: 1px solid transparent;
+      transition: background 0.1s;
+    }
+    .student-item:hover { background: #f0f9ff; border-color: #bae6fd; }
+    .student-item.drag-over-list { background: #fef3c7; border-color: #f59e0b; }
+    .student-handle { font-size: 14px; color: #9ca3af; flex-shrink: 0; }
+    .student-name { flex: 1; font-size: 12px; word-break: break-word; }
+    .student-delete {
+      background: none;
+      border: none;
+      cursor: pointer;
+      color: #ef4444;
+      font-size: 14px;
+      padding: 2px 4px;
+      border-radius: 3px;
+      line-height: 1;
+      flex-shrink: 0;
+      opacity: 0.6;
+    }
+    .student-delete:hover { opacity: 1; background: #fee2e2; }
+    #students-panel-footer {
+      padding: 10px;
+      border-top: 1px solid #e5e7eb;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    #btn-upload-csv, #btn-clear-all {
+      width: 100%;
+      padding: 7px;
+      border-radius: 5px;
+      border: none;
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 500;
+    }
+    #btn-upload-csv { background: #3b82f6; color: #fff; }
+    #btn-upload-csv:hover { background: #2563eb; }
+    #btn-clear-all { background: #f3f4f6; color: #374151; border: 1px solid #d1d5db; }
+    #btn-clear-all:hover { background: #e5e7eb; }
+    #csv-file-input { display: none; }
+
+    /* ── Modal overlay ───────────────────────────────────────── */
+    #modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.5);
+      z-index: 100;
+      align-items: center;
+      justify-content: center;
+    }
+    #modal-overlay.active { display: flex; }
+    #manage-classes-modal {
+      background: #fff;
+      border-radius: 10px;
+      width: 580px;
+      max-width: 95vw;
+      max-height: 80vh;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+    }
+    .modal-header {
+      padding: 16px 20px;
+      border-bottom: 1px solid #e5e7eb;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .modal-header h2 { font-size: 16px; font-weight: 600; }
+    .modal-close {
+      background: none;
+      border: none;
+      font-size: 20px;
+      cursor: pointer;
+      color: #6b7280;
+      line-height: 1;
+      padding: 2px 6px;
+      border-radius: 4px;
+    }
+    .modal-close:hover { background: #f3f4f6; color: #111; }
+    .modal-body {
+      flex: 1;
+      overflow: hidden;
+      display: flex;
+    }
+    #class-list-pane {
+      width: 160px;
+      flex-shrink: 0;
+      border-right: 1px solid #e5e7eb;
+      overflow-y: auto;
+      background: #f9fafb;
+    }
+    .class-list-item {
+      padding: 10px 14px;
+      cursor: pointer;
+      border-bottom: 1px solid #e5e7eb;
+      font-size: 13px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .class-list-item:hover { background: #f0f9ff; }
+    .class-list-item.selected { background: #eff6ff; font-weight: 600; color: #1d4ed8; }
+    .class-list-item .active-dot {
+      width: 7px; height: 7px;
+      background: #3b82f6;
+      border-radius: 50%;
+      flex-shrink: 0;
+      display: none;
+    }
+    .class-list-item.current .active-dot { display: block; }
+    #btn-add-class {
+      padding: 10px 14px;
+      background: none;
+      border: none;
+      cursor: pointer;
+      color: #3b82f6;
+      font-size: 13px;
+      text-align: left;
+      width: 100%;
+      font-weight: 500;
+    }
+    #btn-add-class:hover { background: #eff6ff; }
+    #class-edit-pane {
+      flex: 1;
+      padding: 20px;
+      overflow-y: auto;
+    }
+    #class-edit-pane .field { margin-bottom: 14px; }
+    #class-edit-pane label {
+      display: block;
+      font-size: 12px;
+      font-weight: 600;
+      color: #374151;
+      margin-bottom: 4px;
+    }
+    #class-edit-pane input[type="text"],
+    #class-edit-pane input[type="number"] {
+      width: 100%;
+      padding: 7px 10px;
+      border: 1px solid #d1d5db;
+      border-radius: 5px;
+      font-size: 14px;
+    }
+    #class-edit-pane input:focus {
+      outline: none;
+      border-color: #3b82f6;
+      box-shadow: 0 0 0 2px rgba(59,130,246,0.2);
+    }
+    .field-row { display: flex; gap: 10px; }
+    .field-row .field { flex: 1; }
+    .edit-actions {
+      display: flex;
+      gap: 8px;
+      margin-top: 18px;
+    }
+    #btn-save-class {
+      padding: 8px 18px;
+      background: #3b82f6;
+      color: #fff;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      font-weight: 500;
+    }
+    #btn-save-class:hover { background: #2563eb; }
+    #btn-activate-class {
+      padding: 8px 18px;
+      background: #059669;
+      color: #fff;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      font-weight: 500;
+    }
+    #btn-activate-class:hover { background: #047857; }
+    #btn-delete-class {
+      padding: 8px 18px;
+      background: #fff;
+      color: #ef4444;
+      border: 1px solid #fca5a5;
+      border-radius: 5px;
+      cursor: pointer;
+      font-weight: 500;
+      margin-left: auto;
+    }
+    #btn-delete-class:hover { background: #fee2e2; }
+    #no-class-selected {
+      color: #9ca3af;
+      font-size: 13px;
+      margin-top: 40px;
+      text-align: center;
+    }
+
+    /* ── CSV mapping modal ───────────────────────────────────── */
+    #csv-modal-overlay {
+      display: none; position: fixed; inset: 0;
+      background: rgba(0,0,0,0.5); z-index: 150;
+      align-items: center; justify-content: center;
+    }
+    #csv-modal-overlay.active { display: flex; }
+    #csv-mapping-modal {
+      background: #fff; border-radius: 10px;
+      width: 440px; max-width: 95vw;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+      display: flex; flex-direction: column;
+    }
+    #csv-modal-body { padding: 20px; display: flex; flex-direction: column; gap: 14px; }
+    .csv-modal-hint { font-size: 13px; color: #6b7280; }
+    .csv-field-row { display: flex; gap: 12px; }
+    .csv-field { flex: 1; display: flex; flex-direction: column; gap: 4px; }
+    .csv-field label { font-size: 12px; font-weight: 600; color: #374151; }
+    .csv-field select { padding: 7px 8px; border: 1px solid #d1d5db; border-radius: 5px; font-size: 13px; }
+    .csv-field select:focus { outline: none; border-color: #3b82f6; }
+    .csv-checkbox-label { font-size: 13px; display: flex; align-items: center; gap: 6px; cursor: pointer; }
+    #csv-preview {
+      background: #f9fafb; border: 1px solid #e5e7eb;
+      border-radius: 6px; padding: 10px 12px;
+      font-size: 12px; color: #374151; min-height: 54px;
+    }
+    #csv-preview .preview-row { padding: 2px 0; }
+    #csv-preview .preview-empty { color: #9ca3af; font-style: italic; }
+    #csv-modal-footer {
+      padding: 14px 20px; border-top: 1px solid #e5e7eb;
+      display: flex; justify-content: flex-end; gap: 8px;
+    }
+    #btn-cancel-csv {
+      padding: 7px 16px; border-radius: 5px;
+      background: #f3f4f6; border: 1px solid #d1d5db;
+      cursor: pointer; font-size: 13px;
+    }
+    #btn-confirm-csv {
+      padding: 7px 16px; border-radius: 5px;
+      background: #3b82f6; color: #fff; border: none;
+      cursor: pointer; font-size: 13px; font-weight: 500;
+    }
+    #btn-confirm-csv:hover { background: #2563eb; }
+
+    /* ── Toast ───────────────────────────────────────────────── */
+    #toast {
+      position: fixed;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%) translateY(10px);
+      background: #1e293b;
+      color: #fff;
+      padding: 8px 18px;
+      border-radius: 20px;
+      font-size: 13px;
+      opacity: 0;
+      transition: opacity 0.25s, transform 0.25s;
+      pointer-events: none;
+      z-index: 200;
+    }
+    #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+    /* ── Print styles ────────────────────────────────────────── */
+    @media print {
+      body { background: #fff; overflow: visible; height: auto; }
+      #toolbar, #students-panel { display: none !important; }
+      #main { overflow: visible; }
+      #classroom-area { overflow: visible; padding: 0; }
+      #seat-grid-wrapper { overflow: visible; align-items: flex-start; }
+      .seat {
+        print-color-adjust: exact;
+        -webkit-print-color-adjust: exact;
+      }
+      .seat.occupied {
+        background: #eff6ff !important;
+        border-color: #3b82f6 !important;
+      }
+      .seat.disabled {
+        background: var(--disabled-bg) !important;
+        border-color: #9ca3af !important;
+      }
+      .aisle-separator { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- Toast notification -->
+<div id="toast"></div>
+
+<!-- CSV mapping modal -->
+<div id="csv-modal-overlay">
+  <div id="csv-mapping-modal">
+    <div class="modal-header">
+      <h2>Map CSV Columns</h2>
+      <button class="modal-close" id="btn-close-csv-modal">&times;</button>
+    </div>
+    <div id="csv-modal-body">
+      <p class="csv-modal-hint">Choose which columns contain student names.</p>
+      <div class="csv-field-row">
+        <div class="csv-field">
+          <label for="csv-col-last">Last Name column</label>
+          <select id="csv-col-last"></select>
+        </div>
+        <div class="csv-field">
+          <label for="csv-col-first">First Name column</label>
+          <select id="csv-col-first"></select>
+        </div>
+      </div>
+      <label class="csv-checkbox-label">
+        <input type="checkbox" id="csv-skip-header" checked>
+        First row is a header — skip it
+      </label>
+      <div id="csv-preview"></div>
+    </div>
+    <div id="csv-modal-footer">
+      <button id="btn-cancel-csv">Cancel</button>
+      <button id="btn-confirm-csv">Import</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal overlay -->
+<div id="modal-overlay">
+  <div id="manage-classes-modal">
+    <div class="modal-header">
+      <h2>Manage Classes</h2>
+      <button class="modal-close" id="btn-close-modal">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div id="class-list-pane">
+        <!-- class list items rendered here -->
+        <button id="btn-add-class">+ Add Class</button>
+      </div>
+      <div id="class-edit-pane">
+        <div id="no-class-selected">Select a class to edit</div>
+        <div id="class-edit-form" style="display:none">
+          <div class="field">
+            <label for="input-class-name">Class Name</label>
+            <input type="text" id="input-class-name" placeholder="e.g. Period 1">
+          </div>
+          <div class="field-row">
+            <div class="field">
+              <label for="input-rows">Rows</label>
+              <input type="number" id="input-rows" min="1" max="20" value="4">
+            </div>
+            <div class="field">
+              <label for="input-cols">Columns</label>
+              <input type="number" id="input-cols" min="1" max="20" value="6">
+            </div>
+            <div class="field">
+              <label for="input-aisle">Aisle Every</label>
+              <input type="number" id="input-aisle" min="0" max="20" value="2">
+            </div>
+          </div>
+          <div class="edit-actions">
+            <button id="btn-save-class">Save</button>
+            <button id="btn-activate-class">Set Active</button>
+            <button id="btn-delete-class">Delete</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Toolbar -->
+<div id="toolbar">
+  <h1>Seating Chart</h1>
+  <select id="class-selector" title="Active class"></select>
+  <button id="btn-manage">Manage Classes</button>
+  <button id="btn-import-json">Import JSON</button>
+  <button id="btn-export-json">Export JSON</button>
+  <button id="btn-export-pdf">Export PDF</button>
+  <input type="file" id="json-file-input" accept=".json" style="display:none">
+</div>
+
+<!-- Main content -->
+<div id="main">
+  <div id="classroom-area">
+    <div class="room-label">&#9650; Back of Room</div>
+    <div id="seat-grid-wrapper">
+      <div id="seat-grid"></div>
+    </div>
+    <div class="room-label">&#9660; Front of Room</div>
+  </div>
+
+  <div id="students-panel">
+    <div id="students-panel-header">
+      <h2>Students</h2>
+      <div id="unseated-count">0 unseated</div>
+    </div>
+    <div id="students-list"></div>
+    <div id="students-panel-footer">
+      <button id="btn-upload-csv">&#8679; Upload CSV</button>
+      <button id="btn-clear-all">Clear Seating</button>
+      <input type="file" id="csv-file-input" accept=".csv,.txt">
+    </div>
+  </div>
+</div>
+
+<script>
+'use strict';
+
+// ── State ───────────────────────────────────────────────────────────────────
+const state = {
+  classes: [],
+  activeClassId: null
+};
+
+// The currently-editing class in the modal
+let modalEditingId = null;
+
+// Global DnD payload (avoids dataTransfer limitations in dragover)
+let currentDragPayload = null;
+
+// Base seat dimensions used as the reference for auto-fit scaling
+const BASE_SEAT_W = 90;
+const BASE_SEAT_H = 70;
+const BASE_GAP = 8;
+const BASE_AISLE_GAP = 14;
+const GRID_MARGIN = 16;
+
+// Raw rows from PapaParse, held while CSV mapping modal is open
+let csvParsedRows = [];
+
+// ── Utilities ───────────────────────────────────────────────────────────────
+function generateId() {
+  return 'cls-' + Math.random().toString(36).slice(2, 10);
+}
+
+function getActiveClass() {
+  return state.classes.find(c => c.id === state.activeClassId) || null;
+}
+
+function saveState() {
+  try { localStorage.setItem('seatingState', JSON.stringify(state)); } catch(e) {}
+}
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2200);
+}
+
+// ── Grid helpers ─────────────────────────────────────────────────────────────
+/**
+ * Returns { template, colPositions[] }
+ * colPositions[logicalCol] = 1-based CSS grid column index
+ */
+function buildColumnTemplate(cols, aisleEvery) {
+  const seatW = 'var(--seat-w)';
+  const aisleW = 'var(--aisle-gap)';
+  const parts = [];
+  const colPositions = [];
+  let gridCol = 1;
+
+  for (let c = 0; c < cols; c++) {
+    colPositions.push(gridCol);
+    parts.push(seatW);
+    gridCol++;
+
+    // Insert aisle after every N columns (but not after the last column)
+    if (aisleEvery > 0 && (c + 1) % aisleEvery === 0 && c < cols - 1) {
+      parts.push(aisleW);
+      gridCol++;
+    }
+  }
+
+  return { template: parts.join(' '), colPositions };
+}
+
+// ── Prune out-of-bounds seats ─────────────────────────────────────────────
+function pruneOutOfBoundsSeats(cls, newRows, newCols) {
+  const toRemove = [];
+  for (const key of Object.keys(cls.seats)) {
+    const [r, c] = key.split('-').map(Number);
+    if (r >= newRows || c >= newCols) toRemove.push(key);
+  }
+  toRemove.forEach(k => delete cls.seats[k]);
+
+  cls.disabledSeats = cls.disabledSeats.filter(key => {
+    const [r, c] = key.split('-').map(Number);
+    return r < newRows && c < newCols;
+  });
+}
+
+// ── Render: class selector ────────────────────────────────────────────────
+function renderClassSelector() {
+  const sel = document.getElementById('class-selector');
+  const currentVal = sel.value;
+  sel.innerHTML = '';
+  state.classes.forEach(cls => {
+    const opt = document.createElement('option');
+    opt.value = cls.id;
+    opt.textContent = cls.name;
+    if (cls.id === state.activeClassId) opt.selected = true;
+    sel.appendChild(opt);
+  });
+  // Restore if still valid
+  if (currentVal && state.classes.find(c => c.id === currentVal)) {
+    sel.value = currentVal;
+  }
+}
+
+// ── Render: seating grid ──────────────────────────────────────────────────
+function renderSeatingGrid() {
+  const grid = document.getElementById('seat-grid');
+  grid.innerHTML = '';
+
+  const cls = getActiveClass();
+  if (!cls) {
+    grid.style.gridTemplateColumns = '';
+    grid.style.gridTemplateRows = '';
+    return;
+  }
+
+  const { rows, cols, aisleEvery } = cls;
+  const { template, colPositions } = buildColumnTemplate(cols, aisleEvery);
+
+  grid.style.gridTemplateColumns = template;
+  grid.style.gridTemplateRows = `repeat(${rows}, var(--seat-h))`;
+
+  // Insert aisle spacer elements (once, spanning all rows)
+  insertAisleSpacers(grid, cols, aisleEvery, colPositions, rows);
+
+  // Build seats
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const key = `${r}-${c}`;
+      const seat = document.createElement('div');
+      seat.className = 'seat';
+      seat.dataset.key = key;
+      seat.style.gridColumn = colPositions[c];
+      seat.style.gridRow = r + 1;
+
+      const isDisabled = cls.disabledSeats.includes(key);
+      const occupantName = cls.seats[key];
+
+      if (isDisabled) {
+        seat.classList.add('disabled');
+        seat.draggable = false;
+      } else if (occupantName) {
+        seat.classList.add('occupied');
+        seat.draggable = true;
+        const nameEl = document.createElement('div');
+        nameEl.className = 'seat-name';
+        const commaIdx = occupantName.indexOf(', ');
+        if (commaIdx !== -1) {
+          const firstEl = document.createElement('div');
+          firstEl.className = 'seat-first-name';
+          firstEl.textContent = occupantName.slice(commaIdx + 2);
+          const lastEl = document.createElement('div');
+          lastEl.className = 'seat-last-name';
+          lastEl.textContent = occupantName.slice(0, commaIdx);
+          nameEl.appendChild(firstEl);
+          nameEl.appendChild(lastEl);
+        } else {
+          nameEl.textContent = occupantName;
+        }
+        seat.appendChild(nameEl);
+      } else {
+        seat.draggable = false;
+        const hint = document.createElement('div');
+        hint.className = 'seat-empty-hint';
+        hint.textContent = '+ drop';
+        seat.appendChild(hint);
+      }
+
+      // Drag events
+      seat.addEventListener('dragstart', onSeatDragStart);
+      seat.addEventListener('dragover', onSeatDragOver);
+      seat.addEventListener('dragleave', onSeatDragLeave);
+      seat.addEventListener('drop', onSeatDrop);
+      seat.addEventListener('dragend', onDragEnd);
+
+      // Right-click to disable/enable
+      seat.addEventListener('contextmenu', onSeatContextMenu);
+
+      grid.appendChild(seat);
+    }
+  }
+}
+
+function insertAisleSpacers(grid, cols, aisleEvery, colPositions, rows) {
+  if (aisleEvery <= 0) return;
+
+  // Aisle spacers sit in the gap columns between seat columns
+  // A gap column is at grid column (colPositions[c] + 1) right after every aisleEvery-th seat col
+  const addedAisleGridCols = new Set();
+
+  for (let c = 0; c < cols - 1; c++) {
+    if ((c + 1) % aisleEvery === 0) {
+      // The aisle column is colPositions[c] + 1
+      const aisleGridCol = colPositions[c] + 1;
+      if (!addedAisleGridCols.has(aisleGridCol)) {
+        addedAisleGridCols.add(aisleGridCol);
+        const spacer = document.createElement('div');
+        spacer.className = 'aisle-separator';
+        spacer.style.gridColumn = aisleGridCol;
+        spacer.style.gridRow = `1 / ${rows + 1}`;
+        grid.appendChild(spacer);
+      }
+    }
+  }
+}
+
+// ── Render: students panel ────────────────────────────────────────────────
+function renderStudentsList() {
+  const list = document.getElementById('students-list');
+  const countEl = document.getElementById('unseated-count');
+  list.innerHTML = '';
+
+  const cls = getActiveClass();
+  if (!cls) {
+    countEl.textContent = '0 unseated';
+    return;
+  }
+
+  // Build set of seated names
+  const seatedNames = new Set(Object.values(cls.seats));
+  const unseated = cls.students.filter(n => !seatedNames.has(n));
+
+  const total = cls.students.length;
+  const unseatedCount = unseated.length;
+  countEl.textContent = `${total} total · ${unseatedCount} unseated`;
+
+  unseated.forEach(name => {
+    const item = document.createElement('div');
+    item.className = 'student-item';
+    item.draggable = true;
+    item.dataset.name = encodeURIComponent(name);
+
+    const handle = document.createElement('span');
+    handle.className = 'student-handle';
+    handle.textContent = '⠿';
+
+    const nameEl = document.createElement('span');
+    nameEl.className = 'student-name';
+    nameEl.textContent = name;
+
+    const del = document.createElement('button');
+    del.className = 'student-delete';
+    del.textContent = '✕';
+    del.title = 'Remove student';
+    del.addEventListener('click', e => {
+      e.stopPropagation();
+      removeStudent(name);
+    });
+
+    item.appendChild(handle);
+    item.appendChild(nameEl);
+    item.appendChild(del);
+
+    item.addEventListener('dragstart', onStudentDragStart);
+    item.addEventListener('dragend', onDragEnd);
+
+    list.appendChild(item);
+  });
+
+  // Make the list itself a drop target for unassigning
+  list.addEventListener('dragover', onListDragOver);
+  list.addEventListener('dragleave', onListDragLeave);
+  list.addEventListener('drop', onListDrop);
+}
+
+function removeStudent(name) {
+  const cls = getActiveClass();
+  if (!cls) return;
+  cls.students = cls.students.filter(n => n !== name);
+  // Remove from any seat
+  for (const key of Object.keys(cls.seats)) {
+    if (cls.seats[key] === name) delete cls.seats[key];
+  }
+  saveState();
+  renderAll();
+}
+
+// ── Render all ───────────────────────────────────────────────────────────
+function renderAll() {
+  renderClassSelector();
+  renderSeatingGrid();
+  renderStudentsList();
+  fitGrid();
+}
+
+// ── Auto-fit grid to available space ──────────────────────────────────────
+function fitGrid() {
+  const cls = getActiveClass();
+  const wrapper = document.getElementById('seat-grid-wrapper');
+  const grid = document.getElementById('seat-grid');
+
+  if (!cls) {
+    ['--seat-w','--seat-h','--seat-gap','--aisle-gap','--seat-name-size','--seat-hint-size']
+      .forEach(p => grid.style.removeProperty(p));
+    return;
+  }
+
+  const { rows, cols, aisleEvery } = cls;
+  const numAisles = aisleEvery > 0 ? Math.floor((cols - 1) / aisleEvery) : 0;
+
+  const availW = wrapper.clientWidth  - GRID_MARGIN * 2;
+  const availH = wrapper.clientHeight - GRID_MARGIN * 2;
+  if (availW <= 0 || availH <= 0) return;
+
+  const totalGridCols = cols + numAisles;
+  const naturalW = cols * BASE_SEAT_W + numAisles * BASE_AISLE_GAP + (totalGridCols - 1) * BASE_GAP;
+  const naturalH = rows * BASE_SEAT_H + (rows - 1) * BASE_GAP;
+
+  const scale = Math.min(availW / naturalW, availH / naturalH);
+
+  grid.style.setProperty('--seat-w',         `${BASE_SEAT_W   * scale}px`);
+  grid.style.setProperty('--seat-h',         `${BASE_SEAT_H   * scale}px`);
+  grid.style.setProperty('--seat-gap',       `${BASE_GAP      * scale}px`);
+  grid.style.setProperty('--aisle-gap',      `${BASE_AISLE_GAP * scale}px`);
+  grid.style.setProperty('--seat-name-size', `${Math.max(8, 11 * scale)}px`);
+  grid.style.setProperty('--seat-hint-size', `${Math.max(7, 10 * scale)}px`);
+}
+
+// ── Drag and Drop handlers ────────────────────────────────────────────────
+function onStudentDragStart(e) {
+  const name = decodeURIComponent(e.currentTarget.dataset.name);
+  currentDragPayload = { type: 'from-list', name };
+  e.dataTransfer.effectAllowed = 'move';
+  e.dataTransfer.setData('text/plain', name); // fallback
+}
+
+function onSeatDragStart(e) {
+  const seat = e.currentTarget;
+  if (seat.classList.contains('disabled')) { e.preventDefault(); return; }
+  const key = seat.dataset.key;
+  const cls = getActiveClass();
+  const name = cls && cls.seats[key];
+  if (!name) { e.preventDefault(); return; }
+  currentDragPayload = { type: 'from-seat', name, fromKey: key };
+  e.dataTransfer.effectAllowed = 'move';
+  e.dataTransfer.setData('text/plain', name);
+}
+
+function onSeatDragOver(e) {
+  const seat = e.currentTarget;
+  if (seat.classList.contains('disabled')) return;
+  if (!currentDragPayload) return;
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'move';
+  seat.classList.add('drag-over');
+}
+
+function onSeatDragLeave(e) {
+  e.currentTarget.classList.remove('drag-over');
+}
+
+function onSeatDrop(e) {
+  e.preventDefault();
+  const seat = e.currentTarget;
+  seat.classList.remove('drag-over');
+
+  if (seat.classList.contains('disabled')) return;
+  if (!currentDragPayload) return;
+
+  const cls = getActiveClass();
+  if (!cls) return;
+
+  const toKey = seat.dataset.key;
+  const { type, name, fromKey } = currentDragPayload;
+
+  if (type === 'from-list') {
+    // Place from list: if seat occupied, move occupant back to unseated (just remove from seat)
+    // The name is already in cls.students; just assign
+    const existing = cls.seats[toKey];
+    if (existing) {
+      // existing goes back to list (just delete from seat — it's already in students)
+      delete cls.seats[toKey];
+    }
+    cls.seats[toKey] = name;
+
+  } else if (type === 'from-seat') {
+    if (fromKey === toKey) return;
+    const existing = cls.seats[toKey];
+    if (existing) {
+      // Swap
+      cls.seats[fromKey] = existing;
+    } else {
+      delete cls.seats[fromKey];
+    }
+    cls.seats[toKey] = name;
+  }
+
+  currentDragPayload = null;
+  saveState();
+  renderAll();
+}
+
+function onDragEnd() {
+  currentDragPayload = null;
+  // Clean up any lingering drag-over classes
+  document.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
+}
+
+function onListDragOver(e) {
+  if (!currentDragPayload || currentDragPayload.type !== 'from-seat') return;
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'move';
+  document.getElementById('students-list').classList.add('drag-over-list');
+}
+
+function onListDragLeave(e) {
+  // Only remove if leaving the list itself (not entering a child)
+  if (!document.getElementById('students-list').contains(e.relatedTarget)) {
+    document.getElementById('students-list').classList.remove('drag-over-list');
+  }
+}
+
+function onListDrop(e) {
+  e.preventDefault();
+  document.getElementById('students-list').classList.remove('drag-over-list');
+
+  if (!currentDragPayload || currentDragPayload.type !== 'from-seat') return;
+  const cls = getActiveClass();
+  if (!cls) return;
+
+  const { fromKey } = currentDragPayload;
+  delete cls.seats[fromKey];
+  currentDragPayload = null;
+  saveState();
+  renderAll();
+}
+
+// ── Right-click to disable/enable seats ──────────────────────────────────
+function onSeatContextMenu(e) {
+  e.preventDefault();
+  const seat = e.currentTarget;
+  const key = seat.dataset.key;
+  const cls = getActiveClass();
+  if (!cls) return;
+
+  const idx = cls.disabledSeats.indexOf(key);
+  if (idx === -1) {
+    // Disable: remove any occupant first
+    if (cls.seats[key]) delete cls.seats[key];
+    cls.disabledSeats.push(key);
+  } else {
+    cls.disabledSeats.splice(idx, 1);
+  }
+
+  saveState();
+  renderAll();
+}
+
+// ── CSV Upload ────────────────────────────────────────────────────────────
+function handleCSVFile(file) {
+  const cls = getActiveClass();
+  if (!cls) return;
+  Papa.parse(file, {
+    skipEmptyLines: true,
+    header: false,
+    complete: results => {
+      csvParsedRows = results.data;
+      if (!csvParsedRows.length) { showToast('CSV is empty.'); return; }
+      openCSVMappingModal();
+    },
+    error: () => showToast('Error parsing CSV file.')
+  });
+}
+
+function openCSVMappingModal() {
+  const firstRow = csvParsedRows[0] || [];
+  const numCols = Math.max(...csvParsedRows.map(r => r.length));
+
+  const lastSel = document.getElementById('csv-col-last');
+  const firstSel = document.getElementById('csv-col-first');
+  [lastSel, firstSel].forEach(sel => {
+    sel.innerHTML = '';
+    for (let i = 0; i < numCols; i++) {
+      const opt = document.createElement('option');
+      opt.value = i;
+      const letter = i < 26 ? String.fromCharCode(65 + i) : String(i + 1);
+      const preview = firstRow[i] ? `"${firstRow[i]}"` : '(empty)';
+      opt.textContent = `${letter}: ${preview}`;
+      sel.appendChild(opt);
+    }
+  });
+
+  // Auto-detect columns from first row
+  let autoLast = 0, autoFirst = Math.min(1, numCols - 1);
+  let headerDetected = false;
+  firstRow.forEach((val, i) => {
+    if (/last|lname|surname|family/i.test(val)) { autoLast = i; headerDetected = true; }
+    if (/first|fname|given/i.test(val)) { autoFirst = i; headerDetected = true; }
+  });
+  lastSel.value = autoLast;
+  firstSel.value = autoFirst;
+  document.getElementById('csv-skip-header').checked = headerDetected;
+
+  updateCSVPreview();
+  document.getElementById('csv-modal-overlay').classList.add('active');
+}
+
+function updateCSVPreview() {
+  const lastIdx = parseInt(document.getElementById('csv-col-last').value);
+  const firstIdx = parseInt(document.getElementById('csv-col-first').value);
+  const skipHeader = document.getElementById('csv-skip-header').checked;
+  const preview = document.getElementById('csv-preview');
+
+  const dataRows = skipHeader ? csvParsedRows.slice(1) : csvParsedRows;
+  const samples = dataRows.slice(0, 3);
+
+  if (!samples.length) {
+    preview.innerHTML = '<span class="preview-empty">No data rows.</span>';
+    document.getElementById('btn-confirm-csv').textContent = 'Import 0 students';
+    return;
+  }
+
+  preview.innerHTML = samples.map(row => {
+    const last = (row[lastIdx] || '').trim();
+    const first = (row[firstIdx] || '').trim();
+    const name = last && first ? `${last}, ${first}` : last || first || '(empty)';
+    return `<div class="preview-row">${name}</div>`;
+  }).join('');
+
+  const total = dataRows.filter(row => {
+    const last = (row[lastIdx] || '').trim();
+    const first = (row[firstIdx] || '').trim();
+    return last || first;
+  }).length;
+  document.getElementById('btn-confirm-csv').textContent = `Import ${total} student${total !== 1 ? 's' : ''}`;
+}
+
+function confirmCSVImport() {
+  const cls = getActiveClass();
+  if (!cls) return;
+
+  const lastIdx = parseInt(document.getElementById('csv-col-last').value);
+  const firstIdx = parseInt(document.getElementById('csv-col-first').value);
+  const skipHeader = document.getElementById('csv-skip-header').checked;
+
+  const dataRows = skipHeader ? csvParsedRows.slice(1) : csvParsedRows;
+  const newNames = dataRows
+    .map(row => {
+      const last = (row[lastIdx] || '').trim();
+      const first = (row[firstIdx] || '').trim();
+      if (!last && !first) return null;
+      return last && first ? `${last}, ${first}` : last || first;
+    })
+    .filter(Boolean)
+    .filter(n => !cls.students.includes(n));
+
+  closeCSVMappingModal();
+
+  if (!newNames.length) { showToast('No new students to add.'); return; }
+  cls.students.push(...newNames);
+  saveState();
+  renderAll();
+  showToast(`Added ${newNames.length} student${newNames.length !== 1 ? 's' : ''}.`);
+}
+
+function closeCSVMappingModal() {
+  document.getElementById('csv-modal-overlay').classList.remove('active');
+  csvParsedRows = [];
+}
+
+// ── Manage Classes modal ──────────────────────────────────────────────────
+function openManageModal() {
+  modalEditingId = null;
+  renderModalClassList();
+  showClassEditForm(null);
+  document.getElementById('modal-overlay').classList.add('active');
+}
+
+function closeManageModal() {
+  document.getElementById('modal-overlay').classList.remove('active');
+}
+
+function renderModalClassList() {
+  const pane = document.getElementById('class-list-pane');
+  // Remove existing items (keep the Add button)
+  pane.querySelectorAll('.class-list-item').forEach(el => el.remove());
+
+  const addBtn = document.getElementById('btn-add-class');
+
+  state.classes.forEach(cls => {
+    const item = document.createElement('div');
+    item.className = 'class-list-item';
+    if (cls.id === modalEditingId) item.classList.add('selected');
+    if (cls.id === state.activeClassId) item.classList.add('current');
+    item.dataset.id = cls.id;
+
+    const dot = document.createElement('span');
+    dot.className = 'active-dot';
+    item.appendChild(dot);
+
+    const nameSpan = document.createElement('span');
+    nameSpan.textContent = cls.name;
+    item.appendChild(nameSpan);
+
+    item.addEventListener('click', () => {
+      modalEditingId = cls.id;
+      renderModalClassList();
+      showClassEditForm(cls);
+    });
+
+    pane.insertBefore(item, addBtn);
+  });
+}
+
+function showClassEditForm(cls) {
+  const noSel = document.getElementById('no-class-selected');
+  const form = document.getElementById('class-edit-form');
+  const activateBtn = document.getElementById('btn-activate-class');
+
+  if (!cls) {
+    noSel.style.display = '';
+    form.style.display = 'none';
+    return;
+  }
+
+  noSel.style.display = 'none';
+  form.style.display = '';
+
+  document.getElementById('input-class-name').value = cls.name;
+  document.getElementById('input-rows').value = cls.rows;
+  document.getElementById('input-cols').value = cls.cols;
+  document.getElementById('input-aisle').value = cls.aisleEvery;
+
+  activateBtn.style.display = cls.id === state.activeClassId ? 'none' : '';
+}
+
+function saveClassSettings() {
+  if (!modalEditingId) return;
+  const cls = state.classes.find(c => c.id === modalEditingId);
+  if (!cls) return;
+
+  const newName = document.getElementById('input-class-name').value.trim() || cls.name;
+  const newRows = Math.max(1, Math.min(20, parseInt(document.getElementById('input-rows').value) || 4));
+  const newCols = Math.max(1, Math.min(20, parseInt(document.getElementById('input-cols').value) || 6));
+  const newAisle = Math.max(0, Math.min(20, parseInt(document.getElementById('input-aisle').value) || 0));
+
+  pruneOutOfBoundsSeats(cls, newRows, newCols);
+
+  cls.name = newName;
+  cls.rows = newRows;
+  cls.cols = newCols;
+  cls.aisleEvery = newAisle;
+
+  saveState();
+  renderAll();
+  renderModalClassList();
+  showToast('Class settings saved.');
+}
+
+function addNewClass() {
+  const cls = {
+    id: generateId(),
+    name: `Period ${state.classes.length + 1}`,
+    rows: 4,
+    cols: 6,
+    aisleEvery: 2,
+    students: [],
+    seats: {},
+    disabledSeats: []
+  };
+  state.classes.push(cls);
+  saveState();
+  renderAll();
+
+  // Select the new class in the modal
+  modalEditingId = cls.id;
+  renderModalClassList();
+  showClassEditForm(cls);
+}
+
+function deleteClass() {
+  if (state.classes.length <= 1) {
+    showToast('Cannot delete the last class.');
+    return;
+  }
+  if (!modalEditingId) return;
+  if (!confirm('Delete this class? All seating data will be lost.')) return;
+
+  const idx = state.classes.findIndex(c => c.id === modalEditingId);
+  state.classes.splice(idx, 1);
+
+  // If we deleted the active class, switch to first
+  if (state.activeClassId === modalEditingId) {
+    state.activeClassId = state.classes[0].id;
+  }
+
+  modalEditingId = null;
+  saveState();
+  renderAll();
+  renderModalClassList();
+  showClassEditForm(null);
+}
+
+function activateClassFromModal() {
+  if (!modalEditingId) return;
+  state.activeClassId = modalEditingId;
+  saveState();
+  renderAll();
+  renderModalClassList();
+  showClassEditForm(state.classes.find(c => c.id === modalEditingId));
+  showToast('Active class updated.');
+}
+
+// ── JSON export / import ──────────────────────────────────────────────────
+function exportJSON() {
+  const json = JSON.stringify(state, null, 2);
+  const blob = new Blob([json], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  const activeClass = getActiveClass();
+  const name = activeClass ? activeClass.name.replace(/\s+/g, '-') : 'seating';
+  a.download = `seating-${name}-${Date.now()}.json`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  showToast('JSON exported.');
+}
+
+function importJSON(file) {
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const parsed = JSON.parse(e.target.result);
+      if (!Array.isArray(parsed.classes) || parsed.classes.length === 0) {
+        showToast('Invalid JSON: missing classes array.');
+        return;
+      }
+      // Sanitize each class
+      const sanitized = parsed.classes.map(cls => ({
+        id: cls.id || generateId(),
+        name: cls.name || 'Unnamed',
+        rows: Math.max(1, Math.min(20, parseInt(cls.rows) || 4)),
+        cols: Math.max(1, Math.min(20, parseInt(cls.cols) || 6)),
+        aisleEvery: Math.max(0, Math.min(20, parseInt(cls.aisleEvery) || 0)),
+        students: Array.isArray(cls.students) ? cls.students.map(String) : [],
+        seats: (cls.seats && typeof cls.seats === 'object') ? cls.seats : {},
+        disabledSeats: Array.isArray(cls.disabledSeats) ? cls.disabledSeats : []
+      }));
+      state.classes = sanitized;
+      state.activeClassId = sanitized.find(c => c.id === parsed.activeClassId)
+        ? parsed.activeClassId
+        : sanitized[0].id;
+      saveState();
+      renderAll();
+      showToast('JSON imported successfully.');
+    } catch {
+      showToast('Failed to parse JSON file.');
+    }
+  };
+  reader.readAsText(file);
+}
+
+// ── Clear seating ─────────────────────────────────────────────────────────
+function clearSeating() {
+  const cls = getActiveClass();
+  if (!cls) return;
+  if (!confirm('Clear all seat assignments for this class?')) return;
+  cls.seats = {};
+  saveState();
+  renderAll();
+  showToast('Seating cleared.');
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────
+function init() {
+  // Load from localStorage
+  const saved = localStorage.getItem('seatingState');
+  if (saved) {
+    try {
+      const parsed = JSON.parse(saved);
+      if (Array.isArray(parsed.classes)) {
+        // Ensure all fields exist (forward-compat migration)
+        parsed.classes.forEach(cls => {
+          if (!cls.disabledSeats) cls.disabledSeats = [];
+          if (!cls.seats) cls.seats = {};
+          if (!cls.students) cls.students = [];
+          if (!cls.aisleEvery) cls.aisleEvery = 0;
+        });
+        Object.assign(state, parsed);
+      }
+    } catch(e) {}
+  }
+
+  // Ensure at least one class exists
+  if (!state.classes.length) {
+    state.classes.push({
+      id: generateId(),
+      name: 'Period 1',
+      rows: 4,
+      cols: 6,
+      aisleEvery: 2,
+      students: [],
+      seats: {},
+      disabledSeats: []
+    });
+  }
+
+  // Ensure activeClassId is valid
+  if (!state.classes.find(c => c.id === state.activeClassId)) {
+    state.activeClassId = state.classes[0].id;
+  }
+
+  saveState();
+
+  // ── Wire event listeners ─────────────────────────────────────────────
+  // Class selector
+  document.getElementById('class-selector').addEventListener('change', e => {
+    state.activeClassId = e.target.value;
+    saveState();
+    renderAll();
+  });
+
+  // Toolbar buttons
+  document.getElementById('btn-manage').addEventListener('click', openManageModal);
+  document.getElementById('btn-export-pdf').addEventListener('click', () => window.print());
+  document.getElementById('btn-export-json').addEventListener('click', exportJSON);
+
+  document.getElementById('btn-import-json').addEventListener('click', () => {
+    document.getElementById('json-file-input').click();
+  });
+  document.getElementById('json-file-input').addEventListener('change', e => {
+    const file = e.target.files[0];
+    if (file) { importJSON(file); e.target.value = ''; }
+  });
+
+  // CSV upload
+  document.getElementById('btn-upload-csv').addEventListener('click', () => {
+    document.getElementById('csv-file-input').click();
+  });
+  document.getElementById('csv-file-input').addEventListener('change', e => {
+    const file = e.target.files[0];
+    if (file) { handleCSVFile(file); e.target.value = ''; }
+  });
+
+  // Clear seating
+  document.getElementById('btn-clear-all').addEventListener('click', clearSeating);
+
+  // CSV mapping modal
+  document.getElementById('btn-close-csv-modal').addEventListener('click', closeCSVMappingModal);
+  document.getElementById('btn-cancel-csv').addEventListener('click', closeCSVMappingModal);
+  document.getElementById('btn-confirm-csv').addEventListener('click', confirmCSVImport);
+  document.getElementById('csv-col-last').addEventListener('change', updateCSVPreview);
+  document.getElementById('csv-col-first').addEventListener('change', updateCSVPreview);
+  document.getElementById('csv-skip-header').addEventListener('change', updateCSVPreview);
+  document.getElementById('csv-modal-overlay').addEventListener('click', e => {
+    if (e.target === document.getElementById('csv-modal-overlay')) closeCSVMappingModal();
+  });
+
+  // Modal
+  document.getElementById('btn-close-modal').addEventListener('click', closeManageModal);
+  document.getElementById('modal-overlay').addEventListener('click', e => {
+    if (e.target === document.getElementById('modal-overlay')) closeManageModal();
+  });
+  document.getElementById('btn-add-class').addEventListener('click', addNewClass);
+  document.getElementById('btn-save-class').addEventListener('click', saveClassSettings);
+  document.getElementById('btn-delete-class').addEventListener('click', deleteClass);
+  document.getElementById('btn-activate-class').addEventListener('click', activateClassFromModal);
+
+  // Global dragend cleanup
+  document.addEventListener('dragend', onDragEnd);
+
+  // Re-fit grid whenever the wrapper changes size (window resize, panel toggle, etc.)
+  new ResizeObserver(() => fitGrid()).observe(document.getElementById('seat-grid-wrapper'));
+
+  renderAll();
+}
+
+document.addEventListener('DOMContentLoaded', init);
+</script>
+</body>
+</html>
