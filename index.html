@@ -52,9 +52,7 @@
     #btn-export-json:hover { background: #047857; }
     #btn-toggle-students { background: #475569; }
     #btn-toggle-students:hover { background: #334155; }
-    #backup-counter { margin-left: auto; font-size: 12px; color: #94a3b8; white-space: nowrap; align-self: center; }
-    #backup-counter.warning { color: #fbbf24; }
-    #btn-import-json { background: #7c3aed; }
+    #btn-import-json { background: #7c3aed; margin-left: auto; }
     #btn-import-json:hover { background: #6d28d9; }
     #btn-export-pdf { background: #dc2626; }
     #btn-export-pdf:hover { background: #b91c1c; }
@@ -755,7 +753,6 @@
   <select id="class-selector" title="Active class"></select>
   <button id="btn-export-pdf">Export PDF</button>
   <button id="btn-toggle-students">Hide Student List</button>
-  <span id="backup-counter"></span>
   <button id="btn-import-json">Import Backup</button>
   <button id="btn-export-json">Backup</button>
   <input type="file" id="json-file-input" accept=".json" style="display:none">
@@ -1497,28 +1494,6 @@ function deleteClass() {
 }
 
 
-// ── Backup counter ────────────────────────────────────────────────────────
-function updateBackupCounter() {
-  const el = document.getElementById('backup-counter');
-  const last = localStorage.getItem('lastBackupTime');
-  if (!last) {
-    el.textContent = 'Never backed up';
-    el.classList.add('warning');
-    return;
-  }
-  const days = Math.floor((Date.now() - parseInt(last)) / (1000 * 60 * 60 * 24));
-  if (days === 0) {
-    el.textContent = 'Backed up today';
-    el.classList.remove('warning');
-  } else if (days === 1) {
-    el.textContent = 'Last backup: 1 day ago';
-    el.classList.add('warning');
-  } else {
-    el.textContent = `Last backup: ${days} days ago`;
-    el.classList.add('warning');
-  }
-}
-
 // ── JSON export / import ──────────────────────────────────────────────────
 function exportJSON() {
   const json = JSON.stringify(state, null, 2);
@@ -1530,12 +1505,10 @@ function exportJSON() {
   const date = now.toLocaleDateString('en-CA'); // YYYY-MM-DD
   const time = now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }).replace(':', '-'); // HH-MM
   a.download = `Seating Chart Backup ${date} ${time}.json`;
-  localStorage.setItem('lastBackupTime', Date.now());
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
-  updateBackupCounter();
   showToast('JSON exported.');
 }
 
@@ -1795,7 +1768,6 @@ function init() {
     fitGrid();
   });
   document.getElementById('btn-export-json').addEventListener('click', exportJSON);
-  updateBackupCounter();
 
   document.getElementById('btn-import-json').addEventListener('click', () => {
     document.getElementById('json-file-input').click();
