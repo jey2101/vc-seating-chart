@@ -1503,7 +1503,8 @@ function exportJSON() {
   a.href = url;
   const now = new Date();
   const date = now.toLocaleDateString('en-CA'); // YYYY-MM-DD
-  a.download = `Seating Chart Backup ${date}.json`;
+  const time = now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }).replace(':', '-'); // HH-MM
+  a.download = `Seating Chart Backup ${date} ${time}.json`;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
