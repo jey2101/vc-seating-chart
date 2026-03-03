@@ -52,8 +52,51 @@
     #btn-export-json:hover { background: #047857; }
     #btn-toggle-students { background: #475569; }
     #btn-toggle-students:hover { background: #334155; }
-    #btn-import-json { background: #7c3aed; margin-left: auto; }
+    #btn-help { background: #475569; margin-left: auto; }
+    #btn-help:hover { background: #334155; }
+    #btn-import-json { background: #7c3aed; }
     #btn-import-json:hover { background: #6d28d9; }
+    /* ── Help modal ──────────────────────────────────────────── */
+    #help-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.5);
+      z-index: 100;
+      align-items: center;
+      justify-content: center;
+    }
+    #help-overlay.active { display: flex; }
+    #help-modal {
+      background: #fff;
+      border-radius: 10px;
+      width: 520px;
+      max-width: 95vw;
+      max-height: 85vh;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+    }
+    #help-modal .modal-header { padding: 16px 20px; border-bottom: 1px solid #e5e7eb; display: flex; align-items: center; justify-content: space-between; }
+    #help-modal .modal-header h2 { font-size: 16px; font-weight: 600; }
+    #help-body {
+      padding: 20px 24px;
+      overflow-y: auto;
+      font-size: 14px;
+      line-height: 1.6;
+      color: #374151;
+    }
+    #help-body h3 {
+      font-size: 13px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: #6b7280;
+      margin: 20px 0 6px;
+    }
+    #help-body h3:first-child { margin-top: 0; }
+    #help-body ul { margin: 0; padding-left: 18px; }
+    #help-body li { margin-bottom: 5px; }
     #btn-export-pdf { background: #dc2626; }
     #btn-export-pdf:hover { background: #b91c1c; }
 
@@ -753,6 +796,7 @@
   <select id="class-selector" title="Active class"></select>
   <button id="btn-export-pdf">Export PDF</button>
   <button id="btn-toggle-students">Hide Student List</button>
+  <button id="btn-help">Help</button>
   <button id="btn-import-json">Import Backup</button>
   <button id="btn-export-json">Backup</button>
   <input type="file" id="json-file-input" accept=".json" style="display:none">
@@ -1831,6 +1875,12 @@ function init() {
 
   // CSV mapping modal
   document.getElementById('btn-close-csv-modal').addEventListener('click', closeCSVMappingModal);
+
+  // Help modal
+  const helpOverlay = document.getElementById('help-overlay');
+  document.getElementById('btn-help').addEventListener('click', () => helpOverlay.classList.add('active'));
+  document.getElementById('btn-close-help').addEventListener('click', () => helpOverlay.classList.remove('active'));
+  helpOverlay.addEventListener('click', e => { if (e.target === helpOverlay) helpOverlay.classList.remove('active'); });
   document.getElementById('btn-cancel-csv').addEventListener('click', closeCSVMappingModal);
   document.getElementById('btn-confirm-csv').addEventListener('click', confirmCSVImport);
   document.getElementById('csv-col-last').addEventListener('change', updateCSVPreview);
@@ -1876,5 +1926,48 @@ function init() {
 
 document.addEventListener('DOMContentLoaded', init);
 </script>
+
+<!-- Help modal -->
+<div id="help-overlay">
+  <div id="help-modal">
+    <div class="modal-header">
+      <h2>How to Use Seating Chart</h2>
+      <button class="modal-close" id="btn-close-help">&times;</button>
+    </div>
+    <div id="help-body">
+      <h3>Setting Up a Class</h3>
+      <ul>
+        <li>Click <strong>Manage Classes</strong> to create a new class. Give it a name and set the number of rows and columns to match your classroom layout.</li>
+        <li>Use the dropdown in the toolbar to switch between classes.</li>
+      </ul>
+
+      <h3>Adding Students</h3>
+      <ul>
+        <li>Click <strong>Import Students</strong> and paste or type your student names — one per line, or from a spreadsheet.</li>
+        <li>Students will appear in the <strong>Unassigned</strong> list on the right.</li>
+      </ul>
+
+      <h3>Arranging Seats</h3>
+      <ul>
+        <li>Drag a student from the Unassigned list and drop them into any empty seat.</li>
+        <li>Drag a seated student to a different seat, or back to the Unassigned list to unseat them.</li>
+        <li>Right-click any seat to mark it as unavailable (e.g. a broken desk), or to re-enable it.</li>
+      </ul>
+
+      <h3>Printing</h3>
+      <ul>
+        <li>Click <strong>Export PDF</strong> to print your seating chart. Choose which classes to include.</li>
+        <li>Each seat includes a small grid of boxes for tracking attendance or participation.</li>
+      </ul>
+
+      <h3>Backing Up Your Data</h3>
+      <ul>
+        <li>Click <strong>Backup</strong> to save all your classes to a file on your computer. Keep this somewhere safe, like your Google Drive.</li>
+        <li>Click <strong>Import Backup</strong> to restore your data from a previously saved backup file.</li>
+        <li>Your data is only stored in this browser on this device — backing up regularly protects your work.</li>
+      </ul>
+    </div>
+  </div>
+</div>
 </body>
 </html>
