@@ -1501,9 +1501,9 @@ function exportJSON() {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  const activeClass = getActiveClass();
-  const name = activeClass ? activeClass.name.replace(/\s+/g, '-') : 'seating';
-  a.download = `seating-${name}-${Date.now()}.json`;
+  const now = new Date();
+  const date = now.toLocaleDateString('en-CA'); // YYYY-MM-DD
+  a.download = `Seating Chart Backup ${date}.json`;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
