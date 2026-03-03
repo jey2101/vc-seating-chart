@@ -48,11 +48,11 @@
     #toolbar select { background: #334155; color: #f1f5f9; min-width: 110px; }
     #toolbar button { background: #3b82f6; color: #fff; font-weight: 500; }
     #toolbar button:hover { background: #2563eb; }
-    #btn-manage { background: #475569; }
-    #btn-manage:hover { background: #334155; }
-    #btn-export-json { background: #059669; }
+#btn-export-json { background: #059669; }
     #btn-export-json:hover { background: #047857; }
-    #btn-import-json { background: #7c3aed; }
+    #btn-toggle-students { background: #475569; }
+    #btn-toggle-students:hover { background: #334155; }
+    #btn-import-json { background: #7c3aed; margin-left: auto; }
     #btn-import-json:hover { background: #6d28d9; }
     #btn-export-pdf { background: #dc2626; }
     #btn-export-pdf:hover { background: #b91c1c; }
@@ -161,6 +161,7 @@
       flex-direction: column;
       overflow: hidden;
     }
+    #students-panel.hidden { display: none; }
     #students-panel-header {
       padding: 12px;
       border-bottom: 1px solid #e5e7eb;
@@ -207,7 +208,7 @@
       flex-direction: column;
       gap: 6px;
     }
-    #btn-upload-csv, #btn-clear-all {
+    #btn-add-student, #btn-upload-csv, #btn-clear-all {
       width: 100%;
       padding: 7px;
       border-radius: 5px;
@@ -216,11 +217,66 @@
       font-size: 12px;
       font-weight: 500;
     }
+    #btn-add-student { background: #059669; color: #fff; }
+    #btn-add-student:hover { background: #047857; }
     #btn-upload-csv { background: #3b82f6; color: #fff; }
     #btn-upload-csv:hover { background: #2563eb; }
     #btn-clear-all { background: #f3f4f6; color: #374151; border: 1px solid #d1d5db; }
     #btn-clear-all:hover { background: #e5e7eb; }
     #csv-file-input { display: none; }
+
+    /* ── Add student modal ───────────────────────────────────── */
+    #add-student-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.4);
+      z-index: 200;
+      align-items: center;
+      justify-content: center;
+    }
+    #add-student-overlay.active { display: flex; }
+    #add-student-modal {
+      background: #fff;
+      border-radius: 10px;
+      padding: 24px;
+      width: 300px;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    #add-student-modal h3 { font-size: 15px; font-weight: 600; }
+    #add-student-modal input {
+      width: 100%;
+      padding: 7px 10px;
+      border: 1px solid #d1d5db;
+      border-radius: 5px;
+      font-size: 13px;
+    }
+    #add-student-modal input:focus { outline: none; border-color: #3b82f6; }
+    #add-student-actions { display: flex; gap: 8px; justify-content: flex-end; }
+    #btn-add-student-save {
+      padding: 7px 16px;
+      background: #059669;
+      color: #fff;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 500;
+    }
+    #btn-add-student-save:hover { background: #047857; }
+    #btn-add-student-cancel {
+      padding: 7px 16px;
+      background: #f3f4f6;
+      color: #374151;
+      border: 1px solid #d1d5db;
+      border-radius: 5px;
+      cursor: pointer;
+      font-size: 13px;
+    }
+    #btn-add-student-cancel:hover { background: #e5e7eb; }
 
     /* ── Modal overlay ───────────────────────────────────────── */
     #modal-overlay {
@@ -438,6 +494,64 @@
     }
     #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 
+    /* ── PDF export modal ────────────────────────────────────── */
+    #pdf-select-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.4);
+      z-index: 200;
+      align-items: center;
+      justify-content: center;
+    }
+    #pdf-select-overlay.active { display: flex; }
+    #pdf-select-modal {
+      background: #fff;
+      border-radius: 10px;
+      padding: 24px;
+      width: 300px;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+    #pdf-select-modal h3 { font-size: 15px; font-weight: 600; }
+    #pdf-class-checklist { display: flex; flex-direction: column; gap: 8px; }
+    .pdf-class-option {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+      cursor: pointer;
+    }
+    .pdf-class-option input { cursor: pointer; width: 15px; height: 15px; }
+    #pdf-select-actions { display: flex; gap: 8px; justify-content: flex-end; }
+    #btn-pdf-cancel {
+      padding: 7px 16px;
+      background: #f3f4f6;
+      color: #374151;
+      border: 1px solid #d1d5db;
+      border-radius: 5px;
+      cursor: pointer;
+      font-size: 13px;
+    }
+    #btn-pdf-cancel:hover { background: #e5e7eb; }
+    #btn-pdf-confirm {
+      padding: 7px 16px;
+      background: #dc2626;
+      color: #fff;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 500;
+    }
+    #btn-pdf-confirm:hover { background: #b91c1c; }
+
+    /* ── Multi-print container ───────────────────────────────── */
+    #multi-print-container { display: none; }
+    .print-section-grid { display: grid; gap: var(--seat-gap); position: relative; }
+
     /* ── Print styles ────────────────────────────────────────── */
     @media print {
       @page { size: landscape; margin: 0.5in; }
@@ -480,8 +594,8 @@
       .seat.disabled { visibility: hidden; }
 
       .seat-name { padding: 2px; flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; }
-      .seat-first-name { font-size: var(--print-name-size, 13px); }
-      .seat-last-name { font-size: var(--print-name-size, 13px); color: #000; }
+      .seat-first-name { font-size: var(--print-name-size, 13px); white-space: nowrap; }
+      .seat-last-name { font-size: var(--print-name-size, 13px); color: #000; white-space: nowrap; }
       .seat-empty-hint { display: none; }
 
       .seat-tracker {
@@ -509,10 +623,50 @@
         print-color-adjust: exact;
         -webkit-print-color-adjust: exact;
       }
+
+      /* Multi-class print */
+      body.multi-print #main { display: none !important; }
+      body.multi-print #multi-print-container { display: block !important; }
+      .print-class-section { page-break-after: always; }
+      .print-class-section:last-child { page-break-after: avoid; }
+      .print-section-title {
+        font-size: 28px;
+        font-weight: 700;
+        color: #000;
+        padding: 0 0 16px 0;
+      }
     }
   </style>
 </head>
 <body>
+
+<!-- PDF export modal -->
+<div id="pdf-select-overlay">
+  <div id="pdf-select-modal">
+    <h3>Export PDF</h3>
+    <div id="pdf-class-checklist"></div>
+    <div id="pdf-select-actions">
+      <button id="btn-pdf-cancel">Cancel</button>
+      <button id="btn-pdf-confirm">Export</button>
+    </div>
+  </div>
+</div>
+
+<!-- Multi-class print container -->
+<div id="multi-print-container"></div>
+
+<!-- Add student modal -->
+<div id="add-student-overlay">
+  <div id="add-student-modal">
+    <h3>Add Student</h3>
+    <input type="text" id="input-first-name" placeholder="First name" autocomplete="off">
+    <input type="text" id="input-last-name" placeholder="Last name" autocomplete="off">
+    <div id="add-student-actions">
+      <button id="btn-add-student-cancel">Cancel</button>
+      <button id="btn-add-student-save">Add</button>
+    </div>
+  </div>
+</div>
 
 <!-- Toast notification -->
 <div id="toast"></div>
@@ -597,10 +751,10 @@
 <div id="toolbar">
   <h1>Seating Chart</h1>
   <select id="class-selector" title="Active class"></select>
-  <button id="btn-manage">Manage Classes</button>
-  <button id="btn-import-json">Import JSON</button>
-  <button id="btn-export-json">Export JSON</button>
   <button id="btn-export-pdf">Export PDF</button>
+  <button id="btn-toggle-students">Hide Student List</button>
+  <button id="btn-import-json">Import Backup</button>
+  <button id="btn-export-json">Backup</button>
   <input type="file" id="json-file-input" accept=".json" style="display:none">
 </div>
 
@@ -622,6 +776,7 @@
     </div>
     <div id="students-list"></div>
     <div id="students-panel-footer">
+      <button id="btn-add-student">+ Add Student</button>
       <button id="btn-upload-csv">&#8679; Upload CSV</button>
       <input type="file" id="csv-file-input" accept=".csv,.txt">
     </div>
@@ -731,6 +886,15 @@ function renderClassSelector() {
   if (currentVal && state.classes.find(c => c.id === currentVal)) {
     sel.value = currentVal;
   }
+  // Separator + manage option
+  const sep = document.createElement('option');
+  sep.disabled = true;
+  sep.textContent = '──────────';
+  sel.appendChild(sep);
+  const manageOpt = document.createElement('option');
+  manageOpt.value = '__manage__';
+  manageOpt.textContent = 'Manage Classes…';
+  sel.appendChild(manageOpt);
 }
 
 // ── Render: seating grid ──────────────────────────────────────────────────
@@ -951,7 +1115,7 @@ function fitGrid() {
   grid.style.setProperty('--seat-h',         `${BASE_SEAT_H   * scale}px`);
   grid.style.setProperty('--seat-gap',       `${BASE_GAP      * scale}px`);
   grid.style.setProperty('--aisle-gap',      `${BASE_AISLE_GAP * scale}px`);
-  grid.style.setProperty('--seat-name-size', `${Math.max(8, 11 * scale)}px`);
+  grid.style.setProperty('--seat-name-size', `${Math.max(9, 13 * scale)}px`);
   grid.style.setProperty('--seat-hint-size', `${Math.max(7, 10 * scale)}px`);
 }
 
@@ -1074,8 +1238,8 @@ function onSeatContextMenu(e) {
 
   const idx = cls.disabledSeats.indexOf(key);
   if (idx === -1) {
-    // Disable: remove any occupant first
-    if (cls.seats[key]) delete cls.seats[key];
+    // Don't disable a seat that has a student in it
+    if (cls.seats[key]) return;
     cls.disabledSeats.push(key);
   } else {
     cls.disabledSeats.splice(idx, 1);
@@ -1233,6 +1397,9 @@ function renderModalClassList() {
 
     item.addEventListener('click', () => {
       modalEditingId = cls.id;
+      state.activeClassId = cls.id;
+      saveState();
+      renderAll();
       renderModalClassList();
       showClassEditForm(cls);
     });
@@ -1390,16 +1557,126 @@ function clearSeating() {
   showToast('Seating cleared.');
 }
 
+// ── PDF export (multi-class) ──────────────────────────────────────────────
+function openPDFExportModal() {
+  const list = document.getElementById('pdf-class-checklist');
+  list.innerHTML = '';
+  state.classes.forEach(cls => {
+    const label = document.createElement('label');
+    label.className = 'pdf-class-option';
+    const cb = document.createElement('input');
+    cb.type = 'checkbox';
+    cb.value = cls.id;
+    cb.checked = cls.id === state.activeClassId;
+    label.appendChild(cb);
+    label.appendChild(document.createTextNode(cls.name));
+    list.appendChild(label);
+  });
+  document.getElementById('pdf-select-overlay').classList.add('active');
+}
+
+function closePDFExportModal() {
+  document.getElementById('pdf-select-overlay').classList.remove('active');
+}
+
+function buildPrintSection(cls) {
+  const section = document.createElement('div');
+  section.className = 'print-class-section';
+
+  const title = document.createElement('div');
+  title.className = 'print-section-title';
+  title.textContent = cls.name;
+  section.appendChild(title);
+
+  const { rows, cols, aisleEvery } = cls;
+  const { template, colPositions } = buildColumnTemplate(cols, aisleEvery);
+
+  const grid = document.createElement('div');
+  grid.className = 'print-section-grid';
+  grid.style.gridTemplateColumns = template;
+  grid.style.gridTemplateRows = `repeat(${rows}, var(--seat-h))`;
+  insertAisleSpacers(grid, cols, aisleEvery, colPositions, rows);
+
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const key = `${r}-${c}`;
+      const seat = document.createElement('div');
+      seat.className = 'seat';
+      seat.style.gridColumn = colPositions[c];
+      seat.style.gridRow = r + 1;
+
+      const isDisabled = cls.disabledSeats.includes(key);
+      const occupantName = cls.seats[key];
+
+      if (isDisabled) {
+        seat.classList.add('disabled');
+      } else if (occupantName) {
+        seat.classList.add('occupied');
+        const nameEl = document.createElement('div');
+        nameEl.className = 'seat-name';
+        const commaIdx = occupantName.indexOf(', ');
+        if (commaIdx !== -1) {
+          const firstEl = document.createElement('div');
+          firstEl.className = 'seat-first-name';
+          firstEl.textContent = occupantName.slice(commaIdx + 2);
+          const lastEl = document.createElement('div');
+          lastEl.className = 'seat-last-name';
+          lastEl.textContent = occupantName.slice(0, commaIdx);
+          nameEl.appendChild(firstEl);
+          nameEl.appendChild(lastEl);
+        } else {
+          nameEl.textContent = occupantName;
+        }
+        seat.appendChild(nameEl);
+      } else {
+        const hint = document.createElement('div');
+        hint.className = 'seat-empty-hint';
+        hint.textContent = '+ drop';
+        seat.appendChild(hint);
+      }
+
+      const tracker = document.createElement('div');
+      tracker.className = 'seat-tracker';
+      for (let i = 0; i < 10; i++) tracker.appendChild(document.createElement('span'));
+      seat.appendChild(tracker);
+
+      grid.appendChild(seat);
+    }
+  }
+
+  section.appendChild(grid);
+
+  const fontSize = calcPrintNameFontSize(cls);
+  if (fontSize) section.style.setProperty('--print-name-size', fontSize + 'px');
+
+  return section;
+}
+
+function confirmPDFExport() {
+  const checked = [...document.querySelectorAll('#pdf-class-checklist input:checked')];
+  if (!checked.length) { showToast('Select at least one class.'); return; }
+
+  const selectedClasses = checked.map(cb => state.classes.find(c => c.id === cb.value));
+  closePDFExportModal();
+
+  const container = document.getElementById('multi-print-container');
+  container.innerHTML = '';
+  selectedClasses.forEach(cls => container.appendChild(buildPrintSection(cls)));
+
+  document.body.classList.add('multi-print');
+  window.print();
+}
+
 // ── Print name sizing ─────────────────────────────────────────────────────
 function calcPrintNameFontSize(cls) {
   if (!cls) return null;
-  const CONTENT_W = 115 - 6 * 2; // seat-w minus left+right padding
+  // Account for 1.5px border each side + 6px padding each side, minus 4px safety margin
+  const CONTENT_W = 115 - 1.5 * 2 - 6 * 2 - 4;
   const BASE = 13;
   const FONT = 'system-ui, -apple-system, sans-serif';
 
   const canvas = document.createElement('canvas');
   const ctx = canvas.getContext('2d');
-  ctx.font = `700 ${BASE}px ${FONT}`;
   let maxRatio = 0;
 
   Object.values(cls.seats).forEach(name => {
@@ -1408,8 +1685,13 @@ function calcPrintNameFontSize(cls) {
     const firstName = commaIdx !== -1 ? name.slice(commaIdx + 2) : name;
     const lastName  = commaIdx !== -1 ? name.slice(0, commaIdx) : '';
 
+    ctx.font = `700 ${BASE}px ${FONT}`;
     maxRatio = Math.max(maxRatio, ctx.measureText(firstName).width / CONTENT_W);
-    if (lastName) maxRatio = Math.max(maxRatio, ctx.measureText(lastName).width / CONTENT_W);
+
+    if (lastName) {
+      ctx.font = `400 ${BASE}px ${FONT}`;
+      maxRatio = Math.max(maxRatio, ctx.measureText(lastName).width / CONTENT_W);
+    }
   });
 
   if (maxRatio === 0) return null;
@@ -1460,14 +1742,30 @@ function init() {
   // ── Wire event listeners ─────────────────────────────────────────────
   // Class selector
   document.getElementById('class-selector').addEventListener('change', e => {
+    if (e.target.value === '__manage__') {
+      renderClassSelector(); // reset selection back to active class
+      openManageModal();
+      return;
+    }
     state.activeClassId = e.target.value;
     saveState();
     renderAll();
   });
 
   // Toolbar buttons
-  document.getElementById('btn-manage').addEventListener('click', openManageModal);
-  document.getElementById('btn-export-pdf').addEventListener('click', () => window.print());
+  document.getElementById('btn-export-pdf').addEventListener('click', openPDFExportModal);
+  document.getElementById('btn-pdf-cancel').addEventListener('click', closePDFExportModal);
+  document.getElementById('btn-pdf-confirm').addEventListener('click', confirmPDFExport);
+  document.getElementById('pdf-select-overlay').addEventListener('click', e => {
+    if (e.target === document.getElementById('pdf-select-overlay')) closePDFExportModal();
+  });
+  document.getElementById('btn-toggle-students').addEventListener('click', () => {
+    const panel = document.getElementById('students-panel');
+    const btn = document.getElementById('btn-toggle-students');
+    const hidden = panel.classList.toggle('hidden');
+    btn.textContent = hidden ? 'Show Student List' : 'Hide Student List';
+    fitGrid();
+  });
   document.getElementById('btn-export-json').addEventListener('click', exportJSON);
 
   document.getElementById('btn-import-json').addEventListener('click', () => {
@@ -1477,6 +1775,47 @@ function init() {
     const file = e.target.files[0];
     if (file) { importJSON(file); e.target.value = ''; }
   });
+
+  // Manual add student
+  const addStudentOverlay = document.getElementById('add-student-overlay');
+  const inputFirstName = document.getElementById('input-first-name');
+  const inputLastName  = document.getElementById('input-last-name');
+
+  function openAddStudentModal() {
+    const cls = getActiveClass();
+    if (!cls) { showToast('No active class.'); return; }
+    inputFirstName.value = '';
+    inputLastName.value  = '';
+    addStudentOverlay.classList.add('active');
+    inputFirstName.focus();
+  }
+
+  function closeAddStudentModal() {
+    addStudentOverlay.classList.remove('active');
+  }
+
+  function submitAddStudent() {
+    const cls = getActiveClass();
+    if (!cls) return;
+    const first = inputFirstName.value.trim();
+    const last  = inputLastName.value.trim();
+    if (!first) { inputFirstName.focus(); return; }
+    const name = last ? `${last}, ${first}` : first;
+    if (cls.students.includes(name)) { showToast('Student already exists.'); return; }
+    cls.students.push(name);
+    saveState();
+    renderAll();
+    closeAddStudentModal();
+    showToast(`Added ${name}.`);
+  }
+
+  document.getElementById('btn-add-student').addEventListener('click', openAddStudentModal);
+  document.getElementById('btn-add-student-cancel').addEventListener('click', closeAddStudentModal);
+  document.getElementById('btn-add-student-save').addEventListener('click', submitAddStudent);
+  [inputFirstName, inputLastName].forEach(el =>
+    el.addEventListener('keydown', e => { if (e.key === 'Enter') submitAddStudent(); })
+  );
+  addStudentOverlay.addEventListener('click', e => { if (e.target === addStudentOverlay) closeAddStudentModal(); });
 
   // CSV upload
   document.getElementById('btn-upload-csv').addEventListener('click', () => {
@@ -1516,6 +1855,7 @@ function init() {
   new ResizeObserver(() => fitGrid()).observe(document.getElementById('seat-grid-wrapper'));
 
   window.addEventListener('beforeprint', () => {
+    if (document.body.classList.contains('multi-print')) return;
     ['--seat-w','--seat-h','--seat-gap','--aisle-gap','--seat-name-size','--seat-hint-size']
       .forEach(p => document.getElementById('seat-grid').style.removeProperty(p));
     const size = calcPrintNameFontSize(getActiveClass());
@@ -1523,6 +1863,10 @@ function init() {
   });
   window.addEventListener('afterprint', () => {
     document.documentElement.style.removeProperty('--print-name-size');
+    if (document.body.classList.contains('multi-print')) {
+      document.body.classList.remove('multi-print');
+      document.getElementById('multi-print-container').innerHTML = '';
+    }
     fitGrid();
   });
 
