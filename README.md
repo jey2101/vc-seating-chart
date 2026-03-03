@@ -1,57 +1,32 @@
 # VC Seating Chart
 
-A classroom seating chart app for teachers. Arrange students in a configurable grid, drag and drop them between seats, import rosters from CSV, and export print-ready PDFs with built-in attendance/participation tracker grids.
+A free, easy-to-use tool that lets teachers create and manage classroom seating charts — right in their web browser, with nothing to install.
 
-## Live Demo
+## Open the App
 
 [https://jey2101.github.io/vc-seating-chart/](https://jey2101.github.io/vc-seating-chart/)
 
-## Features
+Just click the link. No account, no download, no setup required.
 
-- **Multiple classes** — create and switch between as many class sections as you need
-- **Configurable grid** — set rows, columns, and aisle spacing per class
-- **Drag-and-drop seating** — move students between seats or to/from an unassigned roster
-- **Disable seats** — mark individual seats as unavailable (e.g. broken chair, blocked view)
-- **CSV import** — paste or upload a student roster; names are parsed automatically
-- **PDF export** — prints in landscape, black-and-white, with auto-sized names and a 5×2 tracker grid under each seat for attendance or participation marks
-- **Persistent state** — all data saved automatically in `localStorage`; your charts survive page refreshes
+## What It Does
 
-## Usage
+### Set up your classroom
+Create a seating chart that matches your actual room. You can set how many rows and columns of desks you have, and even mark individual seats as unavailable (for example, if a desk is broken or you want to leave a gap in the layout).
 
-### Setting up a class
-1. Click **Manage Classes** to create a class and set its grid dimensions (rows, columns, aisle placement).
-2. Click **Import Students** and paste a CSV or newline-separated list of student names.
+### Add your students
+Type or paste in your class roster and the app places all your students in an "Unassigned" list, ready to be seated.
 
-### Arranging seats
-- Drag a student from the **Unassigned** list on the right into any empty seat.
-- Drag a seated student to a different seat, or back to the Unassigned list.
-- Right-click a seat to disable or re-enable it.
+### Drag and drop to arrange seats
+Simply drag a student's name from the unassigned list and drop them into a seat. You can rearrange students at any time by dragging them to a new spot. It's as easy as moving sticky notes on a table.
 
-### Printing
-Click **Print / Export PDF** to open the browser print dialog. The layout switches to a compact, black-and-white grid with a 5-row × 2-column tracker box under each name — suitable for daily use.
+### Manage multiple classes
+You can create a separate seating chart for each class you teach and switch between them with one click.
 
-## Tech Stack
+### Print a seating chart
+When you're ready, click **Print** to get a clean, black-and-white seating chart laid out in landscape format. Each seat includes a small grid of boxes you can use to track attendance or participation marks throughout the day.
 
-- Plain HTML, CSS, and JavaScript — no frameworks, no build step
-- [PapaParse 5.5.3](https://www.papaparse.com/) (loaded from CDN) for CSV parsing
-- Native HTML5 Drag-and-Drop API
-- `window.print()` for PDF export
-- `localStorage` for persistence
+## Your Data Stays Private
 
-## Running Locally
+Everything you enter — your class names, student names, and seat assignments — is saved automatically in your browser on your own device. Nothing is uploaded or shared anywhere. Your data is yours.
 
-No install or build step required. Just open the file in a browser:
-
-```
-open index.html
-```
-
-Or serve it with any static file server if you prefer:
-
-```
-npx serve .
-```
-
-## Data & Privacy
-
-All data (class names, rosters, seat assignments) is stored exclusively in your browser's `localStorage`. Nothing is sent to a server. Clearing your browser data will erase your charts, so use the CSV import/export workflow to back up rosters you want to keep.
+> **Note:** Because data is saved in your browser, it will only be available on the same device and browser you used to create it. If you switch devices or clear your browser history, your charts will not carry over.
