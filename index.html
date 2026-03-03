@@ -137,6 +137,8 @@
       color: #d1d5db;
       pointer-events: none;
     }
+    #print-title { display: none; }
+    .seat-tracker { display: none; }
 
     /* ── Aisle separator ─────────────────────────────────────── */
     .aisle-separator {
@@ -346,16 +348,16 @@
       font-weight: 500;
     }
     #btn-save-class:hover { background: #2563eb; }
-    #btn-activate-class {
+#btn-clear-seating {
       padding: 8px 18px;
-      background: #059669;
-      color: #fff;
-      border: none;
+      background: #fff;
+      color: #f59e0b;
+      border: 1px solid #fcd34d;
       border-radius: 5px;
       cursor: pointer;
       font-weight: 500;
     }
-    #btn-activate-class:hover { background: #047857; }
+    #btn-clear-seating:hover { background: #fffbeb; }
     #btn-delete-class {
       padding: 8px 18px;
       background: #fff;
@@ -438,24 +440,75 @@
 
     /* ── Print styles ────────────────────────────────────────── */
     @media print {
+      @page { size: landscape; margin: 0.5in; }
+
+      :root {
+        --seat-w: 115px;
+        --seat-h: 125px;
+        --seat-gap: 8px;
+        --aisle-gap: 14px;
+      }
+
       body { background: #fff; overflow: visible; height: auto; }
-      #toolbar, #students-panel { display: none !important; }
+      #toolbar, #students-panel, .room-label { display: none !important; }
       #main { overflow: visible; }
-      #classroom-area { overflow: visible; padding: 0; }
-      #seat-grid-wrapper { overflow: visible; align-items: flex-start; }
+      #classroom-area { overflow: visible; padding: 0; align-items: flex-start; }
+      #seat-grid-wrapper { overflow: visible; align-items: flex-start; justify-content: flex-start; }
+
+      #print-title {
+        display: block;
+        font-size: 28px;
+        font-weight: 700;
+        color: #000;
+        padding: 0 0 16px 0;
+      }
+
       .seat {
         print-color-adjust: exact;
         -webkit-print-color-adjust: exact;
+        background: #fff !important;
+        border: 1.5px solid #000 !important;
+        border-radius: 8px;
+        overflow: hidden;
+        flex-direction: column;
+        align-items: center;
+        justify-content: flex-start;
+        padding: 0 6px 6px;
+        cursor: default;
       }
-      .seat.occupied {
-        background: #eff6ff !important;
-        border-color: #3b82f6 !important;
+      .seat.occupied { background: #fff !important; border-color: #000 !important; }
+      .seat.disabled { visibility: hidden; }
+
+      .seat-name { padding: 2px; flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+      .seat-first-name { font-size: var(--print-name-size, 13px); }
+      .seat-last-name { font-size: var(--print-name-size, 13px); color: #000; }
+      .seat-empty-hint { display: none; }
+
+      .seat-tracker {
+        display: grid;
+        grid-template-columns: repeat(5, 1fr);
+        gap: 1px;
+        align-self: stretch;
+        margin: 0 -6px -6px;
+        padding: 0;
+        border-top: 1px solid #000;
+        background: #000;
       }
-      .seat.disabled {
-        background: var(--disabled-bg) !important;
-        border-color: #9ca3af !important;
+      .seat:not(.occupied) .seat-tracker {
+        margin-top: auto;
       }
-      .aisle-separator { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+      .seat-tracker span {
+        display: block;
+        aspect-ratio: 1;
+        background: #fff;
+      }
+
+      .aisle-separator {
+        background: #000 !important;
+        opacity: 1 !important;
+        print-color-adjust: exact;
+        -webkit-print-color-adjust: exact;
+      }
     }
   </style>
 </head>
@@ -531,7 +584,7 @@
           </div>
           <div class="edit-actions">
             <button id="btn-save-class">Save</button>
-            <button id="btn-activate-class">Set Active</button>
+            <button id="btn-clear-seating">Clear Seating</button>
             <button id="btn-delete-class">Delete</button>
           </div>
         </div>
@@ -554,6 +607,7 @@
 <!-- Main content -->
 <div id="main">
   <div id="classroom-area">
+    <div id="print-title"></div>
     <div class="room-label">&#9650; Back of Room</div>
     <div id="seat-grid-wrapper">
       <div id="seat-grid"></div>
@@ -569,7 +623,6 @@
     <div id="students-list"></div>
     <div id="students-panel-footer">
       <button id="btn-upload-csv">&#8679; Upload CSV</button>
-      <button id="btn-clear-all">Clear Seating</button>
       <input type="file" id="csv-file-input" accept=".csv,.txt">
     </div>
   </div>
@@ -744,6 +797,12 @@ function renderSeatingGrid() {
         seat.appendChild(hint);
       }
 
+      // Tracker grid (shown only in print)
+      const tracker = document.createElement('div');
+      tracker.className = 'seat-tracker';
+      for (let i = 0; i < 10; i++) tracker.appendChild(document.createElement('span'));
+      seat.appendChild(tracker);
+
       // Drag events
       seat.addEventListener('dragstart', onSeatDragStart);
       seat.addEventListener('dragover', onSeatDragOver);
@@ -859,6 +918,8 @@ function renderAll() {
   renderSeatingGrid();
   renderStudentsList();
   fitGrid();
+  const cls = getActiveClass();
+  document.getElementById('print-title').textContent = cls ? cls.name : '';
 }
 
 // ── Auto-fit grid to available space ──────────────────────────────────────
@@ -1138,9 +1199,9 @@ function closeCSVMappingModal() {
 
 // ── Manage Classes modal ──────────────────────────────────────────────────
 function openManageModal() {
-  modalEditingId = null;
+  modalEditingId = state.activeClassId || null;
   renderModalClassList();
-  showClassEditForm(null);
+  showClassEditForm(state.classes.find(c => c.id === modalEditingId) || null);
   document.getElementById('modal-overlay').classList.add('active');
 }
 
@@ -1183,8 +1244,6 @@ function renderModalClassList() {
 function showClassEditForm(cls) {
   const noSel = document.getElementById('no-class-selected');
   const form = document.getElementById('class-edit-form');
-  const activateBtn = document.getElementById('btn-activate-class');
-
   if (!cls) {
     noSel.style.display = '';
     form.style.display = 'none';
@@ -1198,8 +1257,6 @@ function showClassEditForm(cls) {
   document.getElementById('input-rows').value = cls.rows;
   document.getElementById('input-cols').value = cls.cols;
   document.getElementById('input-aisle').value = cls.aisleEvery;
-
-  activateBtn.style.display = cls.id === state.activeClassId ? 'none' : '';
 }
 
 function saveClassSettings() {
@@ -1269,15 +1326,6 @@ function deleteClass() {
   showClassEditForm(null);
 }
 
-function activateClassFromModal() {
-  if (!modalEditingId) return;
-  state.activeClassId = modalEditingId;
-  saveState();
-  renderAll();
-  renderModalClassList();
-  showClassEditForm(state.classes.find(c => c.id === modalEditingId));
-  showToast('Active class updated.');
-}
 
 // ── JSON export / import ──────────────────────────────────────────────────
 function exportJSON() {
@@ -1332,13 +1380,40 @@ function importJSON(file) {
 
 // ── Clear seating ─────────────────────────────────────────────────────────
 function clearSeating() {
-  const cls = getActiveClass();
+  if (!modalEditingId) return;
+  const cls = state.classes.find(c => c.id === modalEditingId);
   if (!cls) return;
-  if (!confirm('Clear all seat assignments for this class?')) return;
+  if (!confirm(`Clear all seat assignments for "${cls.name}"?`)) return;
   cls.seats = {};
   saveState();
   renderAll();
   showToast('Seating cleared.');
+}
+
+// ── Print name sizing ─────────────────────────────────────────────────────
+function calcPrintNameFontSize(cls) {
+  if (!cls) return null;
+  const CONTENT_W = 115 - 6 * 2; // seat-w minus left+right padding
+  const BASE = 13;
+  const FONT = 'system-ui, -apple-system, sans-serif';
+
+  const canvas = document.createElement('canvas');
+  const ctx = canvas.getContext('2d');
+  ctx.font = `700 ${BASE}px ${FONT}`;
+  let maxRatio = 0;
+
+  Object.values(cls.seats).forEach(name => {
+    if (!name) return;
+    const commaIdx = name.indexOf(', ');
+    const firstName = commaIdx !== -1 ? name.slice(commaIdx + 2) : name;
+    const lastName  = commaIdx !== -1 ? name.slice(0, commaIdx) : '';
+
+    maxRatio = Math.max(maxRatio, ctx.measureText(firstName).width / CONTENT_W);
+    if (lastName) maxRatio = Math.max(maxRatio, ctx.measureText(lastName).width / CONTENT_W);
+  });
+
+  if (maxRatio === 0) return null;
+  return Math.round(BASE / maxRatio * 10) / 10;
 }
 
 // ── Init ──────────────────────────────────────────────────────────────────
@@ -1412,8 +1487,7 @@ function init() {
     if (file) { handleCSVFile(file); e.target.value = ''; }
   });
 
-  // Clear seating
-  document.getElementById('btn-clear-all').addEventListener('click', clearSeating);
+  document.getElementById('btn-clear-seating').addEventListener('click', clearSeating);
 
   // CSV mapping modal
   document.getElementById('btn-close-csv-modal').addEventListener('click', closeCSVMappingModal);
@@ -1434,13 +1508,23 @@ function init() {
   document.getElementById('btn-add-class').addEventListener('click', addNewClass);
   document.getElementById('btn-save-class').addEventListener('click', saveClassSettings);
   document.getElementById('btn-delete-class').addEventListener('click', deleteClass);
-  document.getElementById('btn-activate-class').addEventListener('click', activateClassFromModal);
 
   // Global dragend cleanup
   document.addEventListener('dragend', onDragEnd);
 
   // Re-fit grid whenever the wrapper changes size (window resize, panel toggle, etc.)
   new ResizeObserver(() => fitGrid()).observe(document.getElementById('seat-grid-wrapper'));
+
+  window.addEventListener('beforeprint', () => {
+    ['--seat-w','--seat-h','--seat-gap','--aisle-gap','--seat-name-size','--seat-hint-size']
+      .forEach(p => document.getElementById('seat-grid').style.removeProperty(p));
+    const size = calcPrintNameFontSize(getActiveClass());
+    if (size) document.documentElement.style.setProperty('--print-name-size', size + 'px');
+  });
+  window.addEventListener('afterprint', () => {
+    document.documentElement.style.removeProperty('--print-name-size');
+    fitGrid();
+  });
 
   renderAll();
 }
