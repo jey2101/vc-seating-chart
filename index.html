@@ -52,8 +52,16 @@
     #btn-export-json:hover { background: #047857; }
     #btn-toggle-students { background: #475569; }
     #btn-toggle-students:hover { background: #334155; }
-    #btn-help { background: #475569; margin-left: auto; }
+    .toolbar-spacer { flex: 1; }
+    #btn-student-view { background: #475569; }
+    #btn-student-view:hover { background: #334155; }
+    #btn-student-view.active { background: #0891b2; }
+    #btn-student-view.active:hover { background: #0e7490; }
+    #btn-help { background: #475569; }
     #btn-help:hover { background: #334155; }
+    #classroom-area.student-view { transform: rotate(180deg); }
+    #classroom-area.student-view .seat { transform: rotate(180deg); }
+    #classroom-area.student-view .room-label { transform: rotate(180deg); }
     #btn-import-json { background: #7c3aed; }
     #btn-import-json:hover { background: #6d28d9; }
     /* ── Help modal ──────────────────────────────────────────── */
@@ -70,7 +78,7 @@
     #help-modal {
       background: #fff;
       border-radius: 10px;
-      width: 650px;
+      width: 800px;
       max-width: 95vw;
       max-height: 85vh;
       display: flex;
@@ -82,12 +90,12 @@
     #help-body {
       padding: 20px 24px;
       overflow-y: auto;
-      font-size: 14px;
+      font-size: 15px;
       line-height: 1.6;
       color: #374151;
     }
     #help-body h3 {
-      font-size: 13px;
+      font-size: 14px;
       font-weight: 700;
       text-transform: uppercase;
       letter-spacing: 0.05em;
@@ -796,6 +804,9 @@
   <select id="class-selector" title="Active class"></select>
   <button id="btn-export-pdf">Export PDF</button>
   <button id="btn-toggle-students">Hide Student List</button>
+  <div class="toolbar-spacer"></div>
+  <button id="btn-student-view">Student View</button>
+  <div class="toolbar-spacer"></div>
   <button id="btn-help">Help</button>
   <button id="btn-import-json">Import Backup</button>
   <button id="btn-export-json">Backup</button>
@@ -1876,6 +1887,15 @@ function init() {
   // CSV mapping modal
   document.getElementById('btn-close-csv-modal').addEventListener('click', closeCSVMappingModal);
 
+  // Student view
+  const btnStudentView = document.getElementById('btn-student-view');
+  const classroomArea = document.getElementById('classroom-area');
+  btnStudentView.addEventListener('click', () => {
+    const active = classroomArea.classList.toggle('student-view');
+    btnStudentView.classList.toggle('active', active);
+    btnStudentView.textContent = active ? 'Teacher View' : 'Student View';
+  });
+
   // Help modal
   const helpOverlay = document.getElementById('help-overlay');
   document.getElementById('btn-help').addEventListener('click', () => helpOverlay.classList.add('active'));
@@ -1931,7 +1951,7 @@ document.addEventListener('DOMContentLoaded', init);
 <div id="help-overlay">
   <div id="help-modal">
     <div class="modal-header">
-      <h2>How to Use Seating Chart</h2>
+      <h2>How to Use the VC Seating Chart App</h2>
       <button class="modal-close" id="btn-close-help">&times;</button>
     </div>
     <div id="help-body">
