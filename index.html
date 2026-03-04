@@ -1707,7 +1707,7 @@ function buildPrintSection(cls, orientation = 'landscape') {
   const isLandscape = orientation === 'landscape';
   const availW = (isLandscape ? 11 : 8.5) * DPI - 2 * MARGIN_IN * DPI;
   const availH = (isLandscape ? 8.5 : 11) * DPI - 2 * MARGIN_IN * DPI;
-  const scale = Math.min(availW / naturalW, (availH - TITLE_H - 4) / naturalH);
+  const scale = Math.min(availW / naturalW, (availH - TITLE_H) / naturalH) * 0.99;
 
   const seatW  = PRINT_SEAT_W  * scale;
   const seatH  = PRINT_SEAT_H  * scale;
@@ -1719,10 +1719,8 @@ function buildPrintSection(cls, orientation = 'landscape') {
   section.style.width  = availW + 'px';
   section.style.margin = '0 auto';
 
-  // Fill section width and center the grid horizontally within it
+  // Override CSS fit-content so inner fills the section exactly (no offset)
   inner.style.width = '100%';
-  inner.style.display = 'flex';
-  inner.style.justifyContent = 'center';
 
   const { colPositions } = buildColumnTemplate(cols, aisleEvery);
 
@@ -1739,6 +1737,8 @@ function buildPrintSection(cls, orientation = 'landscape') {
   grid.style.gridTemplateColumns = colParts.join(' ');
   grid.style.gridTemplateRows    = `repeat(${rows}, ${seatH}px)`;
   grid.style.gap                 = gap + 'px';
+  grid.style.width               = (naturalW * scale) + 'px';
+  grid.style.margin              = '0 auto';
   insertAisleSpacers(grid, cols, aisleEvery, colPositions, rows);
 
   section.style.setProperty('--seat-w', seatW + 'px');
