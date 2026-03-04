@@ -182,7 +182,7 @@
       text-align: center;
     }
     .seat-first-name { font-weight: 700; }
-    .seat-last-name { font-weight: 400; color: #6b7280; }
+    .seat-last-name { font-weight: 400; color: #6b7280; white-space: nowrap; }
     .seat-empty-hint {
       font-size: var(--seat-hint-size, 10px);
       color: #d1d5db;
@@ -560,22 +560,32 @@
       background: #fff;
       border-radius: 10px;
       padding: 24px;
-      width: 300px;
+      width: 380px;
       box-shadow: 0 10px 40px rgba(0,0,0,0.2);
       display: flex;
       flex-direction: column;
       gap: 14px;
     }
     #pdf-select-modal h3 { font-size: 15px; font-weight: 600; }
-    #pdf-class-checklist { display: flex; flex-direction: column; gap: 8px; }
-    .pdf-class-option {
-      display: flex;
-      align-items: center;
-      gap: 8px;
+    #pdf-export-row { display: flex; gap: 8px; align-items: center; }
+    #pdf-class-select {
+      flex: 1;
       font-size: 13px;
-      cursor: pointer;
+      padding: 4px 6px;
+      border: 1px solid #d1d5db;
+      border-radius: 4px;
+      color: #374151;
+      background: #f9fafb;
     }
-    .pdf-class-option input { cursor: pointer; width: 15px; height: 15px; }
+    #pdf-orientation-select {
+      font-size: 13px;
+      padding: 4px 6px;
+      border: 1px solid #d1d5db;
+      border-radius: 4px;
+      cursor: pointer;
+      color: #374151;
+      background: #f9fafb;
+    }
     #pdf-select-actions { display: flex; gap: 8px; justify-content: flex-end; }
     #btn-pdf-cancel {
       padding: 7px 16px;
@@ -606,6 +616,8 @@
     /* ── Print styles ────────────────────────────────────────── */
     @media print {
       @page { size: landscape; margin: 0.5in; }
+      @page landscape-page { size: landscape; margin: 0.5in; }
+      @page portrait-page  { size: portrait;  margin: 0.5in; }
 
       :root {
         --seat-w: 115px;
@@ -680,8 +692,11 @@
       body.multi-print #multi-print-container { display: block !important; }
       .print-class-section { page-break-after: always; }
       .print-class-section:last-child { page-break-after: avoid; }
+      .print-class-section.landscape { page: landscape-page; }
+      .print-class-section.portrait  { page: portrait-page; }
+      .print-class-inner { width: fit-content; margin: 0 auto; }
       .print-section-title {
-        font-size: 28px;
+        font-size: 32px;
         font-weight: 700;
         color: #000;
         padding: 0 0 16px 0;
@@ -695,7 +710,13 @@
 <div id="pdf-select-overlay">
   <div id="pdf-select-modal">
     <h3>Export PDF</h3>
-    <div id="pdf-class-checklist"></div>
+    <div id="pdf-export-row">
+      <select id="pdf-class-select"></select>
+      <select id="pdf-orientation-select">
+        <option value="landscape">Landscape</option>
+        <option value="portrait">Portrait</option>
+      </select>
+    </div>
     <div id="pdf-select-actions">
       <button id="btn-pdf-cancel">Cancel</button>
       <button id="btn-pdf-confirm">Export</button>
@@ -1172,6 +1193,35 @@ function fitGrid() {
   grid.style.setProperty('--aisle-gap',      `${BASE_AISLE_GAP * scale}px`);
   grid.style.setProperty('--seat-name-size', `${Math.max(9, 13 * scale)}px`);
   grid.style.setProperty('--seat-hint-size', `${Math.max(7, 10 * scale)}px`);
+  requestAnimationFrame(fitLastNames);
+}
+
+function fitLastNames() {
+  const grid = document.getElementById('seat-grid');
+  if (!grid) return;
+  const canvas = document.createElement('canvas');
+  const ctx = canvas.getContext('2d');
+  grid.querySelectorAll('.seat-last-name').forEach(el => {
+    el.style.fontSize = '';
+    const cs = getComputedStyle(el);
+    const baseFontSize = parseFloat(cs.fontSize);
+    const fontFamily = cs.fontFamily;
+    const fontWeight = cs.fontWeight;
+    const nameEl = el.closest('.seat-name');
+    if (!nameEl) return;
+    const availW = nameEl.clientWidth - 8; // 4px padding × 2
+    if (availW <= 0) return;
+    ctx.font = `${fontWeight} ${baseFontSize}px ${fontFamily}`;
+    if (ctx.measureText(el.textContent).width <= availW) return;
+    let size = baseFontSize;
+    const minSize = 6;
+    while (size > minSize) {
+      size -= 0.5;
+      ctx.font = `${fontWeight} ${size}px ${fontFamily}`;
+      if (ctx.measureText(el.textContent).width <= availW) break;
+    }
+    el.style.fontSize = size + 'px';
+  });
 }
 
 // ── Drag and Drop handlers ────────────────────────────────────────────────
@@ -1613,20 +1663,16 @@ function clearSeating() {
   showToast('Seating cleared.');
 }
 
-// ── PDF export (multi-class) ──────────────────────────────────────────────
+// ── PDF export (single-class) ─────────────────────────────────────────────
 function openPDFExportModal() {
-  const list = document.getElementById('pdf-class-checklist');
-  list.innerHTML = '';
+  const sel = document.getElementById('pdf-class-select');
+  sel.innerHTML = '';
   state.classes.forEach(cls => {
-    const label = document.createElement('label');
-    label.className = 'pdf-class-option';
-    const cb = document.createElement('input');
-    cb.type = 'checkbox';
-    cb.value = cls.id;
-    cb.checked = cls.id === state.activeClassId;
-    label.appendChild(cb);
-    label.appendChild(document.createTextNode(cls.name));
-    list.appendChild(label);
+    const o = document.createElement('option');
+    o.value = cls.id;
+    o.textContent = cls.name;
+    if (cls.id === state.activeClassId) o.selected = true;
+    sel.appendChild(o);
   });
   document.getElementById('pdf-select-overlay').classList.add('active');
 }
@@ -1635,23 +1681,71 @@ function closePDFExportModal() {
   document.getElementById('pdf-select-overlay').classList.remove('active');
 }
 
-function buildPrintSection(cls) {
+function buildPrintSection(cls, orientation = 'landscape') {
   const section = document.createElement('div');
-  section.className = 'print-class-section';
+  section.className = `print-class-section ${orientation}`;
 
+  // Title is outside inner so it isn't scaled by zoom
   const title = document.createElement('div');
   title.className = 'print-section-title';
   title.textContent = cls.name;
   section.appendChild(title);
 
+  const inner = document.createElement('div');
+  inner.className = 'print-class-inner';
+  section.appendChild(inner);
+
   const { rows, cols, aisleEvery } = cls;
-  const { template, colPositions } = buildColumnTemplate(cols, aisleEvery);
+
+  // Compute scale factor — title excluded from naturalH since it's outside inner
+  const PRINT_SEAT_W = 115, PRINT_SEAT_H = 125, PRINT_GAP = 8, PRINT_AISLE_W = 14;
+  const TITLE_H = 48;
+  const numAisles = aisleEvery > 0 ? Math.floor((cols - 1) / aisleEvery) : 0;
+  const naturalW = cols * PRINT_SEAT_W + numAisles * PRINT_AISLE_W + (cols + numAisles - 1) * PRINT_GAP;
+  const naturalH = rows * PRINT_SEAT_H + (rows - 1) * PRINT_GAP;
+  const DPI = 96, MARGIN_IN = 0.5;
+  const isLandscape = orientation === 'landscape';
+  const availW = (isLandscape ? 11 : 8.5) * DPI - 2 * MARGIN_IN * DPI;
+  const availH = (isLandscape ? 8.5 : 11) * DPI - 2 * MARGIN_IN * DPI;
+  const scale = Math.min(availW / naturalW, (availH - TITLE_H) / naturalH);
+
+  const seatW  = PRINT_SEAT_W  * scale;
+  const seatH  = PRINT_SEAT_H  * scale;
+  const gap    = PRINT_GAP     * scale;
+  const aisleW = PRINT_AISLE_W * scale;
+
+  // Constrain section to its orientation width; center it on whatever page
+  // width Safari uses during its layout pass (fixes mixed-orientation clipping)
+  section.style.width  = availW + 'px';
+  section.style.margin = '0 auto';
+
+  // Override CSS fit-content so inner fills the section exactly (no offset)
+  inner.style.width = '100%';
+
+  const { colPositions } = buildColumnTemplate(cols, aisleEvery);
+
+  // Build explicit-px column template (no CSS var() tokens for Safari compat)
+  const colParts = [];
+  for (let c = 0; c < cols; c++) {
+    colParts.push(seatW + 'px');
+    if (aisleEvery > 0 && (c + 1) % aisleEvery === 0 && c < cols - 1)
+      colParts.push(aisleW + 'px');
+  }
 
   const grid = document.createElement('div');
   grid.className = 'print-section-grid';
-  grid.style.gridTemplateColumns = template;
-  grid.style.gridTemplateRows = `repeat(${rows}, var(--seat-h))`;
+  grid.style.gridTemplateColumns = colParts.join(' ');
+  grid.style.gridTemplateRows    = `repeat(${rows}, ${seatH}px)`;
+  grid.style.gap                 = gap + 'px';
   insertAisleSpacers(grid, cols, aisleEvery, colPositions, rows);
+
+  section.style.setProperty('--seat-w', seatW + 'px');
+  section.style.setProperty('--seat-h', seatH + 'px');
+
+  const fontSize = calcPrintNameFontSize(cls);
+  if (fontSize) section.style.setProperty('--print-name-size', (fontSize * scale) + 'px');
+  const fitCanvas = document.createElement('canvas');
+  const fitCtx = fitCanvas.getContext('2d');
 
   for (let r = 0; r < rows; r++) {
     for (let c = 0; c < cols; c++) {
@@ -1678,6 +1772,7 @@ function buildPrintSection(cls) {
           const lastEl = document.createElement('div');
           lastEl.className = 'seat-last-name';
           lastEl.textContent = occupantName.slice(0, commaIdx);
+          if (fontSize) fitPrintLastName(lastEl, fontSize * scale, fitCtx);
           nameEl.appendChild(firstEl);
           nameEl.appendChild(lastEl);
         } else {
@@ -1700,24 +1795,21 @@ function buildPrintSection(cls) {
     }
   }
 
-  section.appendChild(grid);
-
-  const fontSize = calcPrintNameFontSize(cls);
-  if (fontSize) section.style.setProperty('--print-name-size', fontSize + 'px');
+  inner.appendChild(grid);
 
   return section;
 }
 
 function confirmPDFExport() {
-  const checked = [...document.querySelectorAll('#pdf-class-checklist input:checked')];
-  if (!checked.length) { showToast('Select at least one class.'); return; }
-
-  const selectedClasses = checked.map(cb => state.classes.find(c => c.id === cb.value));
+  const classId = document.getElementById('pdf-class-select').value;
+  const orientation = document.getElementById('pdf-orientation-select').value;
+  const cls = state.classes.find(c => c.id === classId);
+  if (!cls) return;
   closePDFExportModal();
 
   const container = document.getElementById('multi-print-container');
   container.innerHTML = '';
-  selectedClasses.forEach(cls => container.appendChild(buildPrintSection(cls)));
+  container.appendChild(buildPrintSection(cls, orientation));
 
   document.body.classList.add('multi-print');
   window.print();
@@ -1739,19 +1831,28 @@ function calcPrintNameFontSize(cls) {
     if (!name) return;
     const commaIdx = name.indexOf(', ');
     const firstName = commaIdx !== -1 ? name.slice(commaIdx + 2) : name;
-    const lastName  = commaIdx !== -1 ? name.slice(0, commaIdx) : '';
 
     ctx.font = `700 ${BASE}px ${FONT}`;
     maxRatio = Math.max(maxRatio, ctx.measureText(firstName).width / CONTENT_W);
-
-    if (lastName) {
-      ctx.font = `400 ${BASE}px ${FONT}`;
-      maxRatio = Math.max(maxRatio, ctx.measureText(lastName).width / CONTENT_W);
-    }
   });
 
   if (maxRatio === 0) return null;
   return Math.round(BASE / maxRatio * 10) / 10;
+}
+
+function fitPrintLastName(lastEl, baseFontSize, ctx) {
+  const CONTENT_W = 95;
+  const FONT = 'system-ui, -apple-system, sans-serif';
+  let size = baseFontSize;
+  const minSize = 6;
+  ctx.font = `400 ${size}px ${FONT}`;
+  if (ctx.measureText(lastEl.textContent).width <= CONTENT_W) return;
+  while (size > minSize) {
+    size -= 0.5;
+    ctx.font = `400 ${size}px ${FONT}`;
+    if (ctx.measureText(lastEl.textContent).width <= CONTENT_W) break;
+  }
+  lastEl.style.fontSize = size + 'px';
 }
 
 // ── Init ──────────────────────────────────────────────────────────────────
@@ -1930,10 +2031,20 @@ function init() {
     ['--seat-w','--seat-h','--seat-gap','--aisle-gap','--seat-name-size','--seat-hint-size']
       .forEach(p => document.getElementById('seat-grid').style.removeProperty(p));
     const size = calcPrintNameFontSize(getActiveClass());
-    if (size) document.documentElement.style.setProperty('--print-name-size', size + 'px');
+    if (size) {
+      document.documentElement.style.setProperty('--print-name-size', size + 'px');
+      const fitCanvas = document.createElement('canvas');
+      const fitCtx = fitCanvas.getContext('2d');
+      document.querySelectorAll('#seat-grid .seat-last-name').forEach(el => {
+        fitPrintLastName(el, size, fitCtx);
+      });
+    }
   });
   window.addEventListener('afterprint', () => {
     document.documentElement.style.removeProperty('--print-name-size');
+    document.querySelectorAll('#seat-grid .seat-last-name').forEach(el => {
+      el.style.fontSize = '';
+    });
     if (document.body.classList.contains('multi-print')) {
       document.body.classList.remove('multi-print');
       document.getElementById('multi-print-container').innerHTML = '';
