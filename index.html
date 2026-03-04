@@ -687,7 +687,7 @@
         -webkit-print-color-adjust: exact;
       }
 
-      /* Multi-class print */
+      /* PDF export print */
       body.multi-print #main { display: none !important; }
       body.multi-print #multi-print-container { display: block !important; }
       .print-class-section { page-break-after: always; }
@@ -724,7 +724,7 @@
   </div>
 </div>
 
-<!-- Multi-class print container -->
+<!-- PDF print container -->
 <div id="multi-print-container"></div>
 
 <!-- Add student modal -->
@@ -1772,7 +1772,7 @@ function buildPrintSection(cls, orientation = 'landscape') {
           const lastEl = document.createElement('div');
           lastEl.className = 'seat-last-name';
           lastEl.textContent = occupantName.slice(0, commaIdx);
-          if (fontSize) fitPrintLastName(lastEl, fontSize * scale, fitCtx);
+          if (fontSize) fitPrintLastName(lastEl, fontSize * scale, fitCtx, seatW - 15);
           nameEl.appendChild(firstEl);
           nameEl.appendChild(lastEl);
         } else {
@@ -1840,17 +1840,16 @@ function calcPrintNameFontSize(cls) {
   return Math.round(BASE / maxRatio * 10) / 10;
 }
 
-function fitPrintLastName(lastEl, baseFontSize, ctx) {
-  const CONTENT_W = 95;
+function fitPrintLastName(lastEl, baseFontSize, ctx, maxW = 95) {
   const FONT = 'system-ui, -apple-system, sans-serif';
   let size = baseFontSize;
   const minSize = 6;
   ctx.font = `400 ${size}px ${FONT}`;
-  if (ctx.measureText(lastEl.textContent).width <= CONTENT_W) return;
+  if (ctx.measureText(lastEl.textContent).width <= maxW) return;
   while (size > minSize) {
     size -= 0.5;
     ctx.font = `400 ${size}px ${FONT}`;
-    if (ctx.measureText(lastEl.textContent).width <= CONTENT_W) break;
+    if (ctx.measureText(lastEl.textContent).width <= maxW) break;
   }
   lastEl.style.fontSize = size + 'px';
 }
@@ -2087,7 +2086,7 @@ document.addEventListener('DOMContentLoaded', init);
 
       <h3>Printing</h3>
       <ul>
-        <li>Click <strong>Export PDF</strong> to print your seating chart. Choose which classes to include.</li>
+        <li>Click <strong>Export PDF</strong> to print a seating chart. Select a class and page orientation.</li>
         <li>Each seat includes a small grid of boxes for tracking attendance or participation.</li>
       </ul>
 
